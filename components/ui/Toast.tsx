@@ -33,9 +33,9 @@ export default function Toast({ message, type = 'success', isVisible, onClose }:
         >
           <div className={cn(
             "flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border",
-            type === 'success' && "bg-emerald-50 border-emerald-100 text-emerald-800",
-            type === 'error' && "bg-red-50 border-red-100 text-red-800",
-            type === 'info' && "bg-blue-50 border-blue-100 text-blue-800"
+            type === 'success' && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400",
+            type === 'error' && "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800 text-red-800 dark:text-red-400",
+            type === 'info' && "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-800 dark:text-blue-400"
           )}>
             {type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
             {type === 'error' && <AlertCircle className="w-5 h-5 text-red-500" />}

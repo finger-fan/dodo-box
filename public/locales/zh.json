@@ -1,0 +1,59 @@
+{
+  "common": {
+    "messages": "消息",
+    "contacts": "联系人",
+    "settings": "设置",
+    "search": "搜索...",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "copy": "复制",
+    "new": "新建",
+    "logout": "退出登录"
+  },
+  "settings": {
+    "identity_management": "身份管理",
+    "preferences": "偏好设置",
+    "language": "语言",
+    "theme": "主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "系统",
+    "dark_mode": "深色模式",
+    "network_data": "网络与数据",
+    "relays": "中继器",
+    "message_ttl": "消息有效期",
+    "export": "导出",
+    "clear": "清除",
+    "identities": "身份列表",
+    "active_identity": "当前身份",
+    "switch_identity": "切换身份",
+    "new_identity": "新建身份",
+    "edit_identity": "编辑身份",
+    "name": "名称",
+    "generated_key": "生成的密钥",
+    "new_identity_created": "新身份已创建",
+    "identity_updated": "身份名称已更新",
+    "delete_identity": "删除身份",
+    "delete_confirm": "确定要删除此身份吗？所有相关的本地数据都将丢失。"
+  },
+  "contacts": {
+    "add_contact": "添加联系人",
+    "search_contacts": "搜索联系人...",
+    "no_contacts": "未找到联系人",
+    "remove_contact": "移除联系人",
+    "remove_confirm": "确定要移除此联系人吗？此操作无法撤销。",
+    "edit_nickname": "编辑备注",
+    "contact_removed": "联系人已移除",
+    "contact_added": "联系人已成功添加",
+    "nickname_updated": "备注已更新",
+    "invalid_protocol": "无效的联系人协议字符串"
+  },
+  "chat": {
+    "online": "在线",
+    "no_messages": "暂无消息",
+    "today": "今天",
+    "type_message": "输入消息..."
+  }
+}

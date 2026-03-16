@@ -1,0 +1,59 @@
+{
+  "common": {
+    "messages": "Messages",
+    "contacts": "Contacts",
+    "settings": "Settings",
+    "search": "Search...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "copy": "Copy",
+    "new": "New",
+    "logout": "Logout Session"
+  },
+  "settings": {
+    "identity_management": "Identity Management",
+    "preferences": "Preferences",
+    "language": "Language",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "dark_mode": "Dark Mode",
+    "network_data": "Network & Data",
+    "relays": "Relays",
+    "message_ttl": "Message TTL",
+    "export": "Export",
+    "clear": "Clear",
+    "identities": "Identities",
+    "active_identity": "Active Identity",
+    "switch_identity": "Switch Identity",
+    "new_identity": "New Identity",
+    "edit_identity": "Edit Identity",
+    "name": "Name",
+    "generated_key": "Generated Key",
+    "new_identity_created": "New identity created",
+    "identity_updated": "Identity name updated",
+    "delete_identity": "Delete Identity",
+    "delete_confirm": "Are you sure you want to delete this identity? All associated local data will be lost."
+  },
+  "contacts": {
+    "add_contact": "Add Contact",
+    "search_contacts": "Search contacts...",
+    "no_contacts": "No contacts found",
+    "remove_contact": "Remove Contact",
+    "remove_confirm": "Are you sure you want to remove this contact? This action cannot be undone.",
+    "edit_nickname": "Edit Nickname",
+    "contact_removed": "Contact removed",
+    "contact_added": "Contact added successfully",
+    "nickname_updated": "Nickname updated",
+    "invalid_protocol": "Invalid contact protocol string"
+  },
+  "chat": {
+    "online": "Online",
+    "no_messages": "No messages yet",
+    "today": "Today",
+    "type_message": "Type a message..."
+  }
+}

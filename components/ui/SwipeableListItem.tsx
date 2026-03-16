@@ -35,7 +35,7 @@ export default function SwipeableListItem({ children, actions, className }: Swip
   };
 
   return (
-    <div className={cn("relative overflow-hidden bg-white border-b border-zinc-100", className)}>
+    <div className={cn("relative overflow-hidden bg-white dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-800", className)}>
       {/* Actions Background */}
       <div 
         ref={actionsRef}
@@ -68,7 +68,7 @@ export default function SwipeableListItem({ children, actions, className }: Swip
         onDragEnd={handleDragEnd}
         animate={controls}
         style={{ x }}
-        className="relative z-10 bg-white cursor-grab active:cursor-grabbing"
+        className="relative z-10 bg-white dark:bg-zinc-950 cursor-grab active:cursor-grabbing"
       >
         {children}
       </motion.div>

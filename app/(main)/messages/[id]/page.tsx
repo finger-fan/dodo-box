@@ -4,30 +4,41 @@ import { useState, useEffect, use } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { MOCK_CHATS, Message } from '@/lib/mock-data';
+import { INITIAL_CHATS, Chat, Message } from '@/lib/mock-data';
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id } = use(params);
-  const chat = MOCK_CHATS.find(c => c.id === id);
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [mounted, setMounted] = useState(false);
   
   const [msgInput, setMsgInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
-    if (!chat) {
+    requestAnimationFrame(() => {
+      setMounted(true);
+    });
+    const storedChats = localStorage.getItem('doracle_chats');
+    const chats: Chat[] = storedChats ? JSON.parse(storedChats) : INITIAL_CHATS;
+    const foundChat = chats.find(c => c.id === id);
+
+    if (!foundChat) {
       router.push('/messages');
       return;
     }
-
+    
     requestAnimationFrame(() => {
+      setChat(foundChat);
       setMessages([
         { id: '1', text: 'Hey there!', sender: 'them', timestamp: new Date(Date.now() - 3600000) },
         { id: '2', text: 'Hello! How are you?', sender: 'me', timestamp: new Date(Date.now() - 3000000) },
       ]);
     });
-  }, [chat, router]);
+  }, [id, router]);
 
   const handleSend = () => {
     if (!msgInput.trim()) return;
@@ -41,21 +52,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setMsgInput('');
   };
 
-  if (!chat) return null;
+  if (!mounted || !chat) return null;
 
   return (
-    <div className="chat-root flex flex-col h-screen bg-zinc-50">
+    <div className="chat-root flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Chat Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-zinc-100 px-4 h-16 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-zinc-100 rounded-full transition-colors">
-          <ChevronLeft className="w-6 h-6 text-zinc-600" />
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 px-4 h-16 flex items-center gap-3">
+        <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+          <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
         </button>
-        <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-100 relative">
+        <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
           <Image src={chat.avatar} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="header-name font-bold text-zinc-900 truncate">{chat.name}</div>
-          <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</div>
+          <div className="header-name font-bold text-zinc-900 dark:text-zinc-100 truncate">{chat.name}</div>
+          <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{t('chat.online')}</div>
         </div>
       </header>
 
@@ -63,12 +74,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {messages.length === 0 ? (
           <div className="empty-chat flex flex-col items-center justify-center h-full opacity-20">
-            <div className="empty-hint text-sm font-medium">No messages yet</div>
+            <div className="empty-hint text-sm font-medium dark:text-zinc-400">{t('chat.no_messages')}</div>
           </div>
         ) : (
           <>
             <div className="date-sep flex justify-center">
-              <span className="px-3 py-1 bg-zinc-200/50 rounded-full text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Today</span>
+              <span className="px-3 py-1 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-full text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t('chat.today')}</span>
             </div>
             {messages.map((msg) => (
               <div 
@@ -82,7 +93,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   "bubble px-4 py-2.5 rounded-2xl text-sm shadow-sm",
                   msg.sender === 'me' 
                     ? "mine bg-emerald-600 text-white rounded-tr-none" 
-                    : "bg-white text-zinc-800 rounded-tl-none border border-zinc-100"
+                    : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-tl-none border border-zinc-100 dark:border-zinc-800"
                 )}>
                   {msg.text}
                 </div>
@@ -96,14 +107,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-zinc-100">
-        <div className="flex items-end gap-2 bg-zinc-100 rounded-2xl p-2">
+      <div className="p-4 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-end gap-2 bg-zinc-100 dark:bg-zinc-900 rounded-2xl p-2">
           <textarea
             value={msgInput}
             onChange={(e) => setMsgInput(e.target.value)}
-            placeholder="Type a message..."
+            placeholder={t('chat.type_message')}
             rows={1}
-            className="msg-input flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 px-2 max-h-32 resize-none"
+            className="msg-input flex-1 bg-transparent border-none focus:ring-0 text-sm text-zinc-900 dark:text-zinc-100 py-2 px-2 max-h-32 resize-none"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -116,7 +127,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             disabled={!msgInput.trim()}
             className={cn(
               "send-btn w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-              msgInput.trim() ? "active bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-zinc-200 text-zinc-400"
+              msgInput.trim() ? "active bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600"
             )}
           >
             <Send className="w-5 h-5" />

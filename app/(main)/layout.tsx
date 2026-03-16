@@ -29,8 +29,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const isChatDetail = pathname.startsWith('/messages/') && pathname !== '/messages';
 
   return (
-    <div className={cn("min-h-screen bg-zinc-50", !isChatDetail && "pb-20")}>
-      <div className="max-w-md mx-auto min-h-screen bg-white shadow-sm relative">
+    <div className={cn("min-h-screen bg-zinc-50 dark:bg-zinc-950", !isChatDetail && "pb-20")}>
+      <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-zinc-950 shadow-sm relative">
         {children}
         {!isChatDetail && <BottomNav />}
       </div>
