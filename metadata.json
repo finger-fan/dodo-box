@@ -1,0 +1,5 @@
+{
+  "name": "Doracle",
+  "description": "Privacy-focused multi-account messaging app based on Nostr protocol with zero learning cost.",
+  "requestFramePermissions": []
+}
