@@ -2,6 +2,7 @@
   "common": {
     "messages": "Messages",
     "contacts": "Contacts",
+    "discover_tab": "Discover",
     "settings": "Settings",
     "search": "Search...",
     "save": "Save",
@@ -55,5 +56,16 @@
     "no_messages": "No messages yet",
     "today": "Today",
     "type_message": "Type a message..."
+  },
+  "discover": {
+    "title": "Discover",
+    "manage_channels": "Manage Channels",
+    "all_posts": "All Posts",
+    "public_channels": "Public Channels",
+    "my_subscriptions": "My Subscriptions",
+    "subscribe": "Subscribe",
+    "unsubscribe": "Unsubscribe",
+    "no_posts": "No posts found in this channel",
+    "search_channels": "Search channels..."
   }
 }

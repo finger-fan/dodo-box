@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Users, Settings } from 'lucide-react';
+import { MessageSquare, Users, Settings, Compass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,7 @@ export default function BottomNav() {
   const navItems = [
     { label: t('common.messages'), icon: MessageSquare, href: '/messages' },
     { label: t('common.contacts'), icon: Users, href: '/contacts' },
+    { label: t('common.discover_tab'), icon: Compass, href: '/discover' },
     { label: t('common.settings'), icon: Settings, href: '/settings' },
   ];
 

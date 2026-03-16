@@ -2,6 +2,7 @@
   "common": {
     "messages": "消息",
     "contacts": "联系人",
+    "discover_tab": "发现",
     "settings": "设置",
     "search": "搜索...",
     "save": "保存",
@@ -55,5 +56,16 @@
     "no_messages": "暂无消息",
     "today": "今天",
     "type_message": "输入消息..."
+  },
+  "discover": {
+    "title": "发现",
+    "manage_channels": "管理频道",
+    "all_posts": "全部动态",
+    "public_channels": "公共频道",
+    "my_subscriptions": "我的订阅",
+    "subscribe": "订阅",
+    "unsubscribe": "取消订阅",
+    "no_posts": "该频道暂无动态",
+    "search_channels": "搜索频道..."
   }
 }
