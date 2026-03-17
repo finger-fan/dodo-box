@@ -5,39 +5,88 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function deriveAccountFromCredentials(username: string, password: string): string {
-  // Mock derivation: username + password + salt (fixed salt for demo)
-  const salt = "doracle_salt_2026";
-  // In a real app, we'd use a proper KDF like PBKDF2 or Argon2
-  return btoa(`${username}:${password}:${salt}`).replace(/=/g, '');
-}
-
-export function encodeContactInfo(pubkey: string): string {
-  // Mock protocol obfuscation
-  return `doracle://contact/${btoa(pubkey).replace(/=/g, '')}`;
-}
-
-export function decodeContactInfo(protocolStr: string): string | null {
-  if (!protocolStr.startsWith('doracle://contact/')) return null;
+/**
+ * Encode a contact pubkey (hex) to a dodobox:// protocol string
+ * Uses npub bech32 encoding via nostr-tools
+ */
+export function encodeContactInfo(pubkeyHex: string): string {
   try {
-    const encoded = protocolStr.replace('doracle://contact/', '');
-    // Add back padding if needed or handle as is
+    const { npubEncode } = require('nostr-tools/nip19');
+    return `dodobox://contact/${npubEncode(pubkeyHex)}`;
+  } catch {
+    return `dodobox://contact/${btoa(pubkeyHex).replace(/=/g, '')}`;
+  }
+}
+
+/**
+ * Decode a dodobox://contact/ protocol string to pubkey hex
+ * Supports npub bech32 and legacy base64
+ */
+export function decodeContactInfo(protocolStr: string): string | null {
+  if (!protocolStr.startsWith('dodobox://contact/')) return null;
+  const encoded = protocolStr.replace('dodobox://contact/', '');
+
+  // Try npub bech32
+  if (encoded.startsWith('npub1')) {
+    try {
+      const { decode } = require('nostr-tools/nip19');
+      const decoded = decode(encoded);
+      if (decoded.type === 'npub') return decoded.data as string;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Legacy base64 fallback
+  try {
     return atob(encoded);
   } catch {
     return null;
   }
 }
 
-export function encodeIdentityInfo(privkey: string): string {
-  return `doracle://identity/${btoa(privkey).replace(/=/g, '')}`;
+/**
+ * Encode a pubkey (hex) to a dodobox://identity/ protocol string
+ */
+export function encodeIdentityInfo(pubkeyHex: string): string {
+  try {
+    const { npubEncode } = require('nostr-tools/nip19');
+    return `dodobox://identity/${npubEncode(pubkeyHex)}`;
+  } catch {
+    return `dodobox://identity/${btoa(pubkeyHex).replace(/=/g, '')}`;
+  }
 }
 
 export function decodeIdentityInfo(protocolStr: string): string | null {
-  if (!protocolStr.startsWith('doracle://identity/')) return null;
+  if (!protocolStr.startsWith('dodobox://identity/')) return null;
+  const encoded = protocolStr.replace('dodobox://identity/', '');
+
+  if (encoded.startsWith('npub1')) {
+    try {
+      const { decode } = require('nostr-tools/nip19');
+      const decoded = decode(encoded);
+      if (decoded.type === 'npub') return decoded.data as string;
+    } catch {
+      // fall through
+    }
+  }
+
   try {
-    const encoded = protocolStr.replace('doracle://identity/', '');
     return atob(encoded);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Format a pubkey hex as short display string
+ */
+export function shortPubkey(pubkeyHex: string): string {
+  try {
+    const { npubEncode } = require('nostr-tools/nip19');
+    const npub = npubEncode(pubkeyHex);
+    return `${npub.slice(0, 8)}...${npub.slice(-4)}`;
+  } catch {
+    return `${pubkeyHex.slice(0, 8)}...`;
   }
 }

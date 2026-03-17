@@ -13,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Doracle - Zero Nostr Onboarding',
+  title: 'dodo-box - Zero Nostr Onboarding',
   description: 'Privacy-focused multi-account messaging app.',
 };
 

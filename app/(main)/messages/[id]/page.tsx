@@ -1,58 +1,57 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { INITIAL_CHATS, Chat, Message } from '@/lib/mock-data';
+import { useMessages } from '@/hooks/nostr/use-messages';
+import { useNostr } from '@/contexts/NostrContext';
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { id } = use(params);
-  const [chat, setChat] = useState<Chat | null>(null);
-  const [mounted, setMounted] = useState(false);
-  
+  const { adapter } = useNostr();
+  const { messages, sendMessage, isSending } = useMessages(id);
   const [msgInput, setMsgInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [chatName, setChatName] = useState('');
+  const [chatAvatar, setChatAvatar] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-    });
-    const storedChats = localStorage.getItem('doracle_chats');
-    const chats: Chat[] = storedChats ? JSON.parse(storedChats) : INITIAL_CHATS;
-    const foundChat = chats.find(c => c.id === id);
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
 
-    if (!foundChat) {
-      router.push('/messages');
-      return;
-    }
-    
-    requestAnimationFrame(() => {
-      setChat(foundChat);
-      setMessages([
-        { id: '1', text: 'Hey there!', sender: 'them', timestamp: new Date(Date.now() - 3600000) },
-        { id: '2', text: 'Hello! How are you?', sender: 'me', timestamp: new Date(Date.now() - 3000000) },
-      ]);
+  // Load contact profile
+  useEffect(() => {
+    if (!id) return;
+    adapter.getProfile(id).then((profile) => {
+      if (profile) {
+        setChatName(profile.displayName || profile.name || id.slice(0, 8) + '...');
+        setChatAvatar(profile.picture || `https://picsum.photos/seed/${id.slice(0, 8)}/100/100`);
+      } else {
+        setChatName(id.slice(0, 8) + '...');
+        setChatAvatar(`https://picsum.photos/seed/${id.slice(0, 8)}/100/100`);
+      }
     });
-  }, [id, router]);
+  }, [id, adapter]);
 
-  const handleSend = () => {
-    if (!msgInput.trim()) return;
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text: msgInput,
-      sender: 'me',
-      timestamp: new Date()
-    };
-    setMessages([...messages, newMsg]);
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!msgInput.trim() || isSending) return;
+    const text = msgInput;
     setMsgInput('');
+    await sendMessage(text);
   };
 
-  if (!mounted || !chat) return null;
+  if (!mounted) return null;
 
   return (
     <div className="chat-root flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -61,11 +60,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
           <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
         </button>
-        <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
-          <Image src={chat.avatar} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
-        </div>
+        {chatAvatar && (
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
+            <Image src={chatAvatar} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
-          <div className="header-name font-bold text-zinc-900 dark:text-zinc-100 truncate">{chat.name}</div>
+          <div className="header-name font-bold text-zinc-900 dark:text-zinc-100 truncate">{chatName}</div>
           <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{t('chat.online')}</div>
         </div>
       </header>
@@ -82,8 +83,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               <span className="px-3 py-1 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-full text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t('chat.today')}</span>
             </div>
             {messages.map((msg) => (
-              <div 
-                key={msg.id} 
+              <div
+                key={msg.id}
                 className={cn(
                   "flex flex-col max-w-[80%]",
                   msg.sender === 'me' ? "ml-auto items-end" : "items-start"
@@ -91,8 +92,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               >
                 <div className={cn(
                   "bubble px-4 py-2.5 rounded-2xl text-sm shadow-sm",
-                  msg.sender === 'me' 
-                    ? "mine bg-emerald-600 text-white rounded-tr-none" 
+                  msg.sender === 'me'
+                    ? "mine bg-emerald-600 text-white rounded-tr-none"
                     : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-tl-none border border-zinc-100 dark:border-zinc-800"
                 )}>
                   {msg.text}
@@ -104,6 +105,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             ))}
           </>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
@@ -124,10 +126,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           />
           <button
             onClick={handleSend}
-            disabled={!msgInput.trim()}
+            disabled={!msgInput.trim() || isSending}
             className={cn(
               "send-btn w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-              msgInput.trim() ? "active bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600"
+              msgInput.trim() && !isSending ? "active bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600"
             )}
           >
             <Send className="w-5 h-5" />

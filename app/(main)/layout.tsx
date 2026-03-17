@@ -4,25 +4,23 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { cn } from '@/lib/utils';
+import { useNostr } from '@/contexts/NostrContext';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { session } = useNostr();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const isUnlocked = localStorage.getItem('doracle_account_active');
-    if (!isUnlocked) {
+    if (!session.isAuthenticated) {
       router.push('/login');
     } else {
-      // Use a microtask or timeout to avoid synchronous setState in effect warning if needed,
-      // but usually setIsReady(true) is fine for mounting. 
-      // The linter is being strict.
       requestAnimationFrame(() => {
         setIsReady(true);
       });
     }
-  }, [router]);
+  }, [router, session.isAuthenticated]);
 
   if (!isReady) return null;
 

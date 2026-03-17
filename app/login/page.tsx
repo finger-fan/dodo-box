@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Shield, UserPlus, LogIn, ArrowRight, User, Lock } from 'lucide-react';
-import { cn, deriveAccountFromCredentials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import Toast from '@/components/ui/Toast';
+import { useNostr } from '@/contexts/NostrContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, register, session } = useNostr();
   const [view, setView] = useState<'initial' | 'login' | 'register'>('initial');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -16,49 +18,34 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const isUnlocked = localStorage.getItem('doracle_account_active');
-    if (isUnlocked) {
+    if (session.isAuthenticated) {
       router.push('/messages');
     }
-  }, [router]);
+  }, [session.isAuthenticated, router]);
 
   const handleLogin = async () => {
     if (!username || !password) return;
-    
     setIsLoading(true);
-    // Simulate relay check (MOCK)
-    setTimeout(() => {
-      const derivedKey = deriveAccountFromCredentials(username, password);
-      // Mock: we store registered accounts in localStorage to simulate relay persistence
-      const registeredAccounts = JSON.parse(localStorage.getItem('doracle_mock_relay_accounts') || '[]');
-      
-      // For demo purposes, allow 'admin'/'admin' by default if no accounts exist
-      if (registeredAccounts.includes(derivedKey) || (username === 'admin' && password === 'admin')) {
-        localStorage.setItem('doracle_account_active', 'true');
-        localStorage.setItem('doracle_current_user', username);
-        router.push('/messages');
-      } else {
-        setToast({ message: "Account not found on relay. Please register first.", type: 'error' });
-        setIsLoading(false);
-      }
-    }, 800);
+    const result = await login(username, password);
+    setIsLoading(false);
+    if (result.success) {
+      router.push('/messages');
+    } else {
+      setToast({ message: result.error || 'Login failed', type: 'error' });
+    }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!username || !password) return;
-    
-    const derivedKey = deriveAccountFromCredentials(username, password);
-    const registeredAccounts = JSON.parse(localStorage.getItem('doracle_mock_relay_accounts') || '[]');
-    
-    if (registeredAccounts.includes(derivedKey)) {
-      setToast({ message: "Account already exists on relay", type: 'error' });
-      return;
+    setIsLoading(true);
+    const result = await register(username, password);
+    setIsLoading(false);
+    if (result.success) {
+      setToast({ message: 'Account registered! You can now login.', type: 'success' });
+      setView('login');
+    } else {
+      setToast({ message: result.error || 'Registration failed', type: 'error' });
     }
-
-    registeredAccounts.push(derivedKey);
-    localStorage.setItem('doracle_mock_relay_accounts', JSON.stringify(registeredAccounts));
-    setToast({ message: "Account registered on relay! You can now login.", type: 'success' });
-    setView('login');
   };
 
   return (
@@ -68,13 +55,13 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-emerald-200">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-display font-bold tracking-tight text-zinc-900">Doracle</h1>
+          <h1 className="text-3xl font-display font-bold tracking-tight text-zinc-900">dodo-box</h1>
           <p className="text-zinc-500 text-sm">Decentralized Account Management</p>
         </div>
 
         <div className="space-y-4">
           {view === 'initial' && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
@@ -88,7 +75,7 @@ export default function LoginPage() {
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-zinc-900">Login to Account</div>
-                  <div className="text-xs text-zinc-500">Derive from username & password</div>
+                  <div className="text-xs text-zinc-500">Derive from username &amp; password</div>
                 </div>
                 <ArrowRight className="w-5 h-5 ml-auto text-zinc-300 group-hover:text-emerald-500 transition-colors" />
               </button>
@@ -110,7 +97,7 @@ export default function LoginPage() {
           )}
 
           {(view === 'login' || view === 'register') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="space-y-4 bg-white p-6 rounded-3xl border border-zinc-200 shadow-xl"
@@ -141,6 +128,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter password"
+                      onKeyDown={(e) => e.key === 'Enter' && (view === 'login' ? handleLogin() : handleRegister())}
                       className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
@@ -170,11 +158,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <Toast 
-        isVisible={!!toast} 
-        message={toast?.message || ''} 
-        type={toast?.type} 
-        onClose={() => setToast(null)} 
+      <Toast
+        isVisible={!!toast}
+        message={toast?.message || ''}
+        type={toast?.type}
+        onClose={() => setToast(null)}
       />
     </main>
   );

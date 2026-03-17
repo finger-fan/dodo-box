@@ -5,26 +5,17 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { INITIAL_CHATS, Chat } from '@/lib/mock-data';
+import { useChats } from '@/hooks/nostr/use-chats';
 
 export default function MessagesPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [chats, setChats] = useState<Chat[]>([]);
+  const { chats } = useChats();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     requestAnimationFrame(() => {
       setMounted(true);
-    });
-    const storedChats = localStorage.getItem('doracle_chats');
-    requestAnimationFrame(() => {
-      if (storedChats) {
-        setChats(JSON.parse(storedChats));
-      } else {
-        setChats(INITIAL_CHATS);
-        localStorage.setItem('doracle_chats', JSON.stringify(INITIAL_CHATS));
-      }
     });
   }, []);
 
@@ -42,8 +33,8 @@ export default function MessagesPage() {
       <div className="flex-1 overflow-y-auto">
         {chats.map((chat) => (
           <button
-            key={chat.id}
-            onClick={() => router.push(`/messages/${chat.id}`)}
+            key={chat.pubkey}
+            onClick={() => router.push(`/messages/${chat.pubkey}`)}
             className="w-full flex items-center gap-4 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border-b border-zinc-50 dark:border-zinc-900"
           >
             <div className="relative">

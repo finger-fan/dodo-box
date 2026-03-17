@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  relay:
+    image: ghcr.io/hoytech/strfry:latest
+    container_name: dodo-box-relay
+    restart: unless-stopped
+    ports:
+      - "7777:7777"
+    volumes:
+      - relay-data:/app/strfry-db
+      - ./docker/strfry.conf:/app/strfry.conf:ro
+    command: ["strfry", "--config", "/app/strfry.conf", "relay"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7777"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dodo-box-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_NOSTR_MOCK=false
+      - NEXT_PUBLIC_DEFAULT_RELAYS=ws://relay:7777
+      - NEXT_PUBLIC_VAULT_SALT=dodobox-vault-v1
+    depends_on:
+      relay:
+        condition: service_healthy
+
+volumes:
+  relay-data:
+    driver: local
