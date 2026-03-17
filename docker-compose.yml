@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   relay:
     image: ghcr.io/hoytech/strfry:latest
@@ -10,9 +8,9 @@ services:
     volumes:
       - relay-data:/app/strfry-db
       - ./docker/strfry.conf:/app/strfry.conf:ro
-    command: ["strfry", "--config", "/app/strfry.conf", "relay"]
+    command: ["--config", "/app/strfry.conf", "relay"]
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "7777"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7777 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

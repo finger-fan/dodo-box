@@ -16,7 +16,9 @@
     "docker:push": "cross-var \"docker push $npm_package_name:$npm_package_version && docker push $npm_package_name:latest\"",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f app"
+    "docker:logs": "docker compose logs -f app",
+    "loc": "find . -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' \\) ! -path '*/node_modules/*' ! -path '*/.next/*' ! -path '*/dist/*' | sort | xargs wc -l",
+    "loc:summary": "find . -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' \\) ! -path '*/node_modules/*' ! -path '*/.next/*' ! -path '*/dist/*' | xargs wc -l 2>/dev/null | tail -1"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
