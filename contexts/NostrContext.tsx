@@ -42,7 +42,7 @@ interface NostrContextValue {
   updateIdentityName(pubkey: string, name: string): Promise<NostrResult>
 }
 
-const NostrContext = createContext<NostrContextValue | null>(null)
+export const NostrContext = createContext<NostrContextValue | null>(null)
 
 export function useNostr(): NostrContextValue {
   const ctx = useContext(NostrContext)

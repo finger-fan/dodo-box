@@ -112,6 +112,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="p-4 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800">
         <div className="flex items-end gap-2 bg-zinc-100 dark:bg-zinc-900 rounded-2xl p-2">
           <textarea
+            data-testid="message-input"
             value={msgInput}
             onChange={(e) => setMsgInput(e.target.value)}
             placeholder={t('chat.type_message')}
@@ -125,6 +126,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             }}
           />
           <button
+            data-testid="send-btn"
             onClick={handleSend}
             disabled={!msgInput.trim() || isSending}
             className={cn(

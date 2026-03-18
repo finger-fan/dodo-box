@@ -1,0 +1,178 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, act, waitFor } from '@testing-library/react'
+import React from 'react'
+import { useMessages } from '@/hooks/nostr/use-messages'
+import { MockNostrAdapter } from '@/lib/nostr/mock-adapter'
+import { NostrContext } from '@/contexts/NostrContext'
+import type { NostrSession, INostrAdapter } from '@/lib/nostr/types'
+
+// Export NostrContext for testing
+// Note: We need access to the internal context
+const ALICE_PUBKEY = 'a'.repeat(64)
+
+const TEST_SESSION: NostrSession = {
+  isAuthenticated: true,
+  username: 'testuser',
+  currentPubkey: ALICE_PUBKEY,
+  vaultData: null,
+}
+
+function makeWrapper(adapter: INostrAdapter, session: NostrSession = TEST_SESSION) {
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <NostrContext.Provider
+        value={{
+          session,
+          adapter,
+          login: vi.fn(),
+          register: vi.fn(),
+          logout: vi.fn(),
+          switchIdentity: vi.fn(),
+          createIdentity: vi.fn(),
+          deleteIdentity: vi.fn(),
+          updateIdentityName: vi.fn(),
+        }}
+      >
+        {children}
+      </NostrContext.Provider>
+    )
+  }
+}
+
+describe('useMessages', () => {
+  let adapter: MockNostrAdapter
+
+  beforeEach(() => {
+    adapter = new MockNostrAdapter()
+  })
+
+  it('loads existing messages on mount', async () => {
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('starts with empty messages when not authenticated', async () => {
+    const unauthSession: NostrSession = { ...TEST_SESSION, isAuthenticated: false }
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter, unauthSession),
+    })
+
+    // Should not load messages
+    await new Promise(r => setTimeout(r, 50))
+    expect(result.current.messages).toEqual([])
+  })
+
+  it('isSending is false initially', () => {
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+    expect(result.current.isSending).toBe(false)
+  })
+
+  it('sendMessage adds optimistic message then replaces with real', async () => {
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    // Wait for initial messages to load
+    await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0))
+    const initialCount = result.current.messages.length
+
+    await act(async () => {
+      await result.current.sendMessage('hello test')
+    })
+
+    const msgs = result.current.messages
+    // Real message should be in the list
+    expect(msgs.length).toBe(initialCount + 1)
+    const sent = msgs.find(m => m.text === 'hello test')
+    expect(sent).toBeDefined()
+    expect(sent!.sender).toBe('me')
+    // Real message should NOT have optimistic- prefix
+    expect(sent!.id).not.toMatch(/^optimistic-/)
+  })
+
+  it('sendMessage returns success result', async () => {
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    let resultValue: Awaited<ReturnType<typeof result.current.sendMessage>> | undefined
+    await act(async () => {
+      resultValue = await result.current.sendMessage('hi')
+    })
+
+    expect(resultValue!.success).toBe(true)
+  })
+
+  it('sendMessage with empty text returns failure', async () => {
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    let resultValue: Awaited<ReturnType<typeof result.current.sendMessage>> | undefined
+    await act(async () => {
+      resultValue = await result.current.sendMessage('   ')
+    })
+
+    expect(resultValue!.success).toBe(false)
+    expect(resultValue!.error).toBeTruthy()
+  })
+
+  it('sendMessage removes optimistic message on adapter failure', async () => {
+    const failAdapter = new MockNostrAdapter()
+    vi.spyOn(failAdapter, 'sendMessage').mockResolvedValue({
+      success: false,
+      error: 'Network error',
+    })
+
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(failAdapter),
+    })
+
+    await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0))
+    const initialCount = result.current.messages.length
+
+    await act(async () => {
+      await result.current.sendMessage('will fail')
+    })
+
+    // Optimistic message should be removed
+    expect(result.current.messages.length).toBe(initialCount)
+    expect(result.current.messages.some(m => m.text === 'will fail')).toBe(false)
+  })
+
+  it('isSending is true during send, false after', async () => {
+    let resolveMsg: (v: Awaited<ReturnType<typeof adapter.sendMessage>>) => void
+    const slowAdapter = new MockNostrAdapter()
+    vi.spyOn(slowAdapter, 'sendMessage').mockReturnValue(
+      new Promise(r => { resolveMsg = r })
+    )
+
+    const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
+      wrapper: makeWrapper(slowAdapter),
+    })
+
+    // Start sending but don't await yet
+    let sendPromise: Promise<unknown>
+    act(() => {
+      sendPromise = result.current.sendMessage('slow message')
+    })
+
+    // isSending should be true
+    expect(result.current.isSending).toBe(true)
+
+    // Resolve and wait
+    await act(async () => {
+      resolveMsg!({ success: true, data: { id: '123', text: 'slow message', sender: 'me', timestamp: new Date() } })
+      await sendPromise
+    })
+
+    expect(result.current.isSending).toBe(false)
+  })
+})

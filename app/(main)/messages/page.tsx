@@ -34,6 +34,7 @@ export default function MessagesPage() {
         {chats.map((chat) => (
           <button
             key={chat.pubkey}
+            data-testid="chat-item"
             onClick={() => router.push(`/messages/${chat.pubkey}`)}
             className="w-full flex items-center gap-4 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border-b border-zinc-50 dark:border-zinc-900"
           >

@@ -67,6 +67,7 @@ export default function LoginPage() {
               className="space-y-4"
             >
               <button
+                data-testid="method-login"
                 onClick={() => setView('login')}
                 className="w-full group flex items-center gap-4 p-4 bg-white rounded-2xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm"
               >
@@ -81,6 +82,7 @@ export default function LoginPage() {
               </button>
 
               <button
+                data-testid="method-register"
                 onClick={() => setView('register')}
                 className="w-full group flex items-center gap-4 p-4 bg-white rounded-2xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm"
               >
@@ -111,6 +113,7 @@ export default function LoginPage() {
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input
+                      data-testid="username-input"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
@@ -124,6 +127,7 @@ export default function LoginPage() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input
+                      data-testid="password-input"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -142,6 +146,7 @@ export default function LoginPage() {
                   Back
                 </button>
                 <button
+                  data-testid="submit-btn"
                   onClick={view === 'login' ? handleLogin : handleRegister}
                   disabled={!username || !password || isLoading}
                   className="flex-[2] px-4 py-3 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-200 flex items-center justify-center"
