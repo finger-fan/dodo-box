@@ -20,11 +20,11 @@ export function createNostrAdapter(session?: NostrSession): INostrAdapter {
   const localMock = localStorage.getItem('dodobox_nostr_mock')
 
   const isMock =
-    envMock !== 'false' ||
-    (localMock !== 'false' && envMock !== 'false') ||
-    !session?.currentPubkey
+    envMock === 'true' ||
+    (localMock === 'true' && envMock !== 'false')
 
   if (isMock) return new MockNostrAdapter()
+  if (!session?.currentPubkey) return new MockNostrAdapter()
 
   const sessionWithKey = session as NostrSession & { currentPrivkey?: string }
   if (!sessionWithKey.currentPrivkey) return new MockNostrAdapter()

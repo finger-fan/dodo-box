@@ -11,9 +11,10 @@ const MOCK_STORAGE_KEY = 'dodobox_vault_mock'
 function isMockMode(): boolean {
   if (typeof window === 'undefined') return true
   const envMock = process.env.NEXT_PUBLIC_NOSTR_MOCK
+  if (envMock === 'true') return true
   if (envMock === 'false') return false
   const localMock = localStorage.getItem('dodobox_nostr_mock')
-  return localMock !== 'false'
+  return localMock === 'true'
 }
 
 export class VaultSync {

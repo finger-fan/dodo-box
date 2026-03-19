@@ -262,14 +262,19 @@ export default function SettingsPage() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
                 <div className="relative z-10 flex items-start justify-between">
                   <div className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">{t('settings.active_identity')}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">
+                      {activeIdentity ? t('settings.active_identity') : t('settings.account_only', 'Account')}
+                    </div>
                     <h3 className="identity-hero-name text-3xl font-display font-bold">{activeDisplay}</h3>
-                    {session.currentPubkey && (
+                    {activeIdentity && session.currentPubkey && (
                       <div className="text-xs font-mono opacity-60">{shortPubkey(session.currentPubkey)}</div>
+                    )}
+                    {!activeIdentity && (
+                      <div className="text-xs opacity-60 mt-1">{t('settings.no_identity_hint', 'Create an identity to start messaging')}</div>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    {session.currentPubkey && (
+                    {activeIdentity && session.currentPubkey && (
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(encodeIdentityInfo(session.currentPubkey!));
