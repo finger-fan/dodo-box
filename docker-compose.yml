@@ -19,14 +19,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     container_name: dodo-box-app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:18300:3000"
     environment:
       - NEXT_PUBLIC_NOSTR_MOCK=false
       - NEXT_PUBLIC_DEFAULT_RELAYS=ws://relay:7777
       - NEXT_PUBLIC_VAULT_SALT=dodobox-vault-v1
+      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     depends_on:
       relay:
         condition: service_healthy
