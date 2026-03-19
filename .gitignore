@@ -5,3 +5,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Test artifacts (generated, not for VCS)
+playwright-report/
+test-results/
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
