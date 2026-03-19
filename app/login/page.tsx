@@ -49,14 +49,14 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-emerald-200">
+          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-emerald-200 dark:shadow-none">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-display font-bold tracking-tight text-zinc-900">dodo-box</h1>
-          <p className="text-zinc-500 text-sm">Decentralized Account Management</p>
+          <h1 className="text-3xl font-display font-bold tracking-tight text-zinc-900 dark:text-zinc-100">dodo-box</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">Decentralized Account Management</p>
         </div>
 
         <div className="space-y-4">
@@ -69,14 +69,14 @@ export default function LoginPage() {
               <button
                 data-testid="method-login"
                 onClick={() => setView('login')}
-                className="w-full group flex items-center gap-4 p-4 bg-white rounded-2xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm"
+                className="w-full group flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 transition-all shadow-sm"
               >
-                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <LogIn className="w-6 h-6" />
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-zinc-900">Login to Account</div>
-                  <div className="text-xs text-zinc-500">Derive from username &amp; password</div>
+                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">Login to Account</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">Derive from username &amp; password</div>
                 </div>
                 <ArrowRight className="w-5 h-5 ml-auto text-zinc-300 group-hover:text-emerald-500 transition-colors" />
               </button>
@@ -84,14 +84,14 @@ export default function LoginPage() {
               <button
                 data-testid="method-register"
                 onClick={() => setView('register')}
-                className="w-full group flex items-center gap-4 p-4 bg-white rounded-2xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm"
+                className="w-full group flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 transition-all shadow-sm"
               >
-                <div className="w-12 h-12 bg-zinc-50 rounded-xl flex items-center justify-center text-zinc-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <UserPlus className="w-6 h-6" />
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-zinc-900">Register Account</div>
-                  <div className="text-xs text-zinc-500">Create new credentials on relay</div>
+                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">Register Account</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">Create new credentials on relay</div>
                 </div>
                 <ArrowRight className="w-5 h-5 ml-auto text-zinc-300 group-hover:text-emerald-500 transition-colors" />
               </button>
@@ -102,14 +102,14 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="space-y-4 bg-white p-6 rounded-3xl border border-zinc-200 shadow-xl"
+              className="space-y-4 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
             >
-              <h2 className="text-xl font-bold text-zinc-900">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                 {view === 'login' ? 'Account Login' : 'Account Registration'}
               </h2>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-500 uppercase ml-1">Username</label>
+                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase ml-1">Username</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input
@@ -118,12 +118,12 @@ export default function LoginPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter username"
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-500 uppercase ml-1">Password</label>
+                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase ml-1">Password</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input
@@ -133,7 +133,7 @@ export default function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter password"
                       onKeyDown={(e) => e.key === 'Enter' && (view === 'login' ? handleLogin() : handleRegister())}
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
@@ -141,7 +141,7 @@ export default function LoginPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setView('initial')}
-                  className="flex-1 px-4 py-3 rounded-xl font-semibold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                 >
                   Back
                 </button>
