@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { cn, encodeContactInfo, decodeContactInfo, encodeIdentityInfo, decodeIdentityInfo, shortPubkey } from '@/lib/utils'
+import { cn, decodeContactInfo, encodeIdentityInfo, decodeIdentityInfo, shortPubkey } from '@/lib/utils'
 
 const FAKE_PUBKEY_HEX = 'a'.repeat(64)
 
@@ -30,21 +30,8 @@ describe('cn', () => {
   })
 })
 
-describe('encodeContactInfo / decodeContactInfo round-trip', () => {
-  it('encodes to dodobox://contact/ prefix', () => {
-    const encoded = encodeContactInfo(FAKE_PUBKEY_HEX)
-    expect(encoded).toMatch(/^dodobox:\/\/contact\//)
-  })
-
-  it('decodes back to original pubkey (npub or base64 path)', () => {
-    const encoded = encodeContactInfo(FAKE_PUBKEY_HEX)
-    const decoded = decodeContactInfo(encoded)
-    // Either the npub decoded pubkey or the base64 decoded value should be meaningful
-    expect(decoded).not.toBeNull()
-    expect(typeof decoded).toBe('string')
-  })
-
-  it('returns null for non-dodobox contact strings', () => {
+describe('decodeContactInfo (legacy backward compat)', () => {
+  it('returns null for non-contact strings', () => {
     expect(decodeContactInfo('https://example.com')).toBeNull()
     expect(decodeContactInfo('')).toBeNull()
     expect(decodeContactInfo('dodobox://identity/abc')).toBeNull()
@@ -52,27 +39,52 @@ describe('encodeContactInfo / decodeContactInfo round-trip', () => {
 
   it('returns null for malformed encoded data', () => {
     const result = decodeContactInfo('dodobox://contact/!!!invalid!!!')
-    // Should return null or empty string (base64 decode may throw)
     expect(result === null || result === '').toBe(true)
   })
 })
 
 describe('encodeIdentityInfo / decodeIdentityInfo round-trip', () => {
-  it('encodes to dodobox://identity/ prefix', () => {
-    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX)
-    expect(encoded).toMatch(/^dodobox:\/\/identity\//)
+  it('encodes to dodobox://identity/npub1 prefix with 3 dash-separated segments', () => {
+    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Alice')
+    expect(encoded).toMatch(/^dodobox:\/\/identity\/npub1/)
+    const body = encoded.replace('dodobox://identity/npub1', '')
+    expect(body.split('-')).toHaveLength(3)
   })
 
-  it('decodes back to a non-null string', () => {
-    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX)
+  it('decodes back to { pubkey, nickname }', () => {
+    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Alice')
     const decoded = decodeIdentityInfo(encoded)
     expect(decoded).not.toBeNull()
-    expect(typeof decoded).toBe('string')
+    expect(decoded!.pubkey).toBe(FAKE_PUBKEY_HEX)
+    expect(decoded!.nickname).toBe('Alice')
+  })
+
+  it('handles unicode nicknames', () => {
+    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Dodo')
+    const decoded = decodeIdentityInfo(encoded)
+    expect(decoded).not.toBeNull()
+    expect(decoded!.nickname).toBe('Dodo')
+  })
+
+  it('returns null for tampered string (checksum fail)', () => {
+    const encoded = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Alice')
+    // flip a char in the payload segment
+    const tampered = encoded.slice(0, 30) + 'ff' + encoded.slice(32)
+    expect(decodeIdentityInfo(tampered)).toBeNull()
   })
 
   it('returns null for non-dodobox identity strings', () => {
     expect(decodeIdentityInfo('dodobox://contact/abc')).toBeNull()
     expect(decodeIdentityInfo('')).toBeNull()
+    expect(decodeIdentityInfo('dodobox://identity/badformat')).toBeNull()
+  })
+
+  it('produces different encodings each time (random key)', () => {
+    const a = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Alice')
+    const b = encodeIdentityInfo(FAKE_PUBKEY_HEX, 'Alice')
+    expect(a).not.toBe(b)
+    // but both decode to the same result
+    expect(decodeIdentityInfo(a)).toEqual(decodeIdentityInfo(b))
   })
 })
 

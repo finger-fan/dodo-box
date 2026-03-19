@@ -96,8 +96,8 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCopyIdentity = (pubkey: string) => {
-    const identityStr = encodeIdentityInfo(pubkey);
+  const handleCopyIdentity = (pubkey: string, nickname: string) => {
+    const identityStr = encodeIdentityInfo(pubkey, nickname);
     navigator.clipboard.writeText(identityStr);
     setToast({ message: t('common.copy_success', 'Identity copied for sharing'), type: 'success' });
   };
@@ -277,7 +277,7 @@ export default function SettingsPage() {
                     {activeIdentity && session.currentPubkey && (
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(encodeIdentityInfo(session.currentPubkey!));
+                          navigator.clipboard.writeText(encodeIdentityInfo(session.currentPubkey!, activeIdentity!.name));
                           setToast({ message: t('common.copy_success'), type: 'success' });
                         }}
                         className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl backdrop-blur-md transition-colors"
@@ -313,7 +313,7 @@ export default function SettingsPage() {
                           },
                           {
                             label: t('common.copy'),
-                            onClick: () => handleCopyIdentity(identity.pubkey),
+                            onClick: () => handleCopyIdentity(identity.pubkey, identity.name),
                             className: 'bg-emerald-500'
                           },
                           {
