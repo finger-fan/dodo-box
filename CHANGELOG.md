@@ -4,6 +4,31 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.2 — 2026-03-19
+
+### Features
+
+- **Identity 分享协议重设计**：新格式 `dodobox://identity/npub1<payload>-<key>-<checksum>`，使用 XOR 加密编码 nickname + pubkey，添加联系人时自动携带昵称而非截断 pubkey
+- **随机 key + checksum**：每次编码生成不同随机 key，附带 1 字节校验，篡改串即失效
+- **npub1 前缀伪装**：分享串外观类似 Nostr npub 密钥
+- **登录页版本号显示**：右下角小字灰色显示当前版本
+
+### Improvements
+
+- **废弃 dodobox://contact/ 协议**：删除 `encodeContactInfo`，统一使用 identity 格式；保留 `decodeContactInfo` 做向后兼容
+- **deploy 命令升级**：新增 CHANGELOG 生成、git tag、release 分支部署流程
+
+### Changed Files
+
+- `lib/utils.ts` — 重写 encodeIdentityInfo/decodeIdentityInfo，新增 XOR + checksum 编解码
+- `lib/nostr/mock-adapter.ts` / `real-adapter.ts` — addContact 支持 identity 协议解码及昵称提取
+- `app/(main)/settings/page.tsx` — Share/Copy 传入 nickname
+- `app/(main)/contacts/page.tsx` — 验证和提示文案统一为 identity 格式
+- `app/login/page.tsx` — 添加版本号显示
+- `tests/unit/lib/utils.test.ts` — 新增 6 个 identity 编解码测试
+
+---
+
 ## v0.8.1 — 2026-03-19
 
 ### Bug Fixes
