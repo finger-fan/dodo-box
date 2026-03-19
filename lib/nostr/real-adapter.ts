@@ -210,8 +210,17 @@ export class RealNostrAdapter implements INostrAdapter {
 
   async addContact(pubkeyOrNpub: string): Promise<NostrResult<NostrContact>> {
     let pubkey = pubkeyOrNpub
+    let contactName = ''
 
-    if (pubkeyOrNpub.startsWith('dodobox://contact/')) {
+    // Handle dodobox://identity/ protocol (nickname + pubkey encoded)
+    if (pubkeyOrNpub.startsWith('dodobox://identity/')) {
+      const { decodeIdentityInfo } = await import('@/lib/utils')
+      const decoded = decodeIdentityInfo(pubkeyOrNpub)
+      if (!decoded) return { success: false, error: 'Invalid identity string' }
+      pubkey = decoded.pubkey
+      contactName = decoded.nickname
+    // Legacy dodobox://contact/ backward compat
+    } else if (pubkeyOrNpub.startsWith('dodobox://contact/')) {
       const encoded = pubkeyOrNpub.replace('dodobox://contact/', '')
       try {
         const { decode } = await import('nostr-tools/nip19')
@@ -236,7 +245,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
     const newContact: NostrContact = {
       id: Date.now().toString(),
-      name: pubkey.slice(0, 8) + '...',
+      name: contactName || pubkey.slice(0, 8) + '...',
       pubkey,
       avatar: `https://picsum.photos/seed/${pubkey.slice(0, 8)}/100/100`,
     }

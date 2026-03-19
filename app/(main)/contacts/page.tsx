@@ -53,9 +53,9 @@ export default function ContactsPage() {
       return;
     }
 
-    // Accept dodobox:// protocol or bare npub1...
-    if (!input.startsWith('dodobox://contact/') && !input.startsWith('npub1') && !input.match(/^[0-9a-f]{64}$/i)) {
-      setError(t('contacts.invalid_protocol', 'Enter a dodobox://contact/... or npub1... string'));
+    // Accept dodobox://identity/ protocol, legacy dodobox://contact/, bare npub1, or hex pubkey
+    if (!input.startsWith('dodobox://identity/') && !input.startsWith('dodobox://contact/') && !input.startsWith('npub1') && !input.match(/^[0-9a-f]{64}$/i)) {
+      setError(t('contacts.invalid_protocol', 'Paste an identity sharing string'));
       return;
     }
 
@@ -200,7 +200,7 @@ export default function ContactsPage() {
                         setContactInput(e.target.value);
                         setError('');
                       }}
-                      placeholder="dodobox://contact/npub1... or npub1..."
+                      placeholder="dodobox://identity/npub1... or npub1..."
                       className="w-full h-32 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none text-sm font-mono"
                     />
                     <button className="btn-cam absolute right-3 bottom-3 p-2 bg-white dark:bg-zinc-700 shadow-sm border border-zinc-100 dark:border-zinc-600 rounded-xl text-zinc-400 hover:text-emerald-600 transition-colors">

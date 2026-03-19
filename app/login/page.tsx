@@ -7,6 +7,7 @@ import { Shield, UserPlus, LogIn, ArrowRight, User, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Toast from '@/components/ui/Toast';
 import { useNostr } from '@/contexts/NostrContext';
+import { version } from '@/package.json';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -169,6 +170,10 @@ export default function LoginPage() {
         type={toast?.type}
         onClose={() => setToast(null)}
       />
+
+      <div className="fixed bottom-4 right-4 text-[10px] font-mono text-zinc-300 dark:text-zinc-600 select-none pointer-events-none">
+        v{version}
+      </div>
     </main>
   );
 }
