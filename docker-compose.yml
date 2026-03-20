@@ -16,12 +16,12 @@ services:
       retries: 5
 
   app:
+    image: dodo-box:${APP_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile
       args:
         - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
-        - NEXT_PUBLIC_NOSTR_MOCK=false
     container_name: dodo-box-app
     restart: unless-stopped
     ports:

@@ -1,31 +1,26 @@
-# Stage 1: Install dependencies
+# Stage 1: Install dependencies (layer cached when package.json + lockfile unchanged)
 FROM node:22-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Stage 2: Build application
-FROM node:22-alpine AS builder
-WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
-COPY --from=deps /app/node_modules ./node_modules
+# Stage 2: Build application (reuses deps layer)
+FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
-ARG NEXT_PUBLIC_NOSTR_MOCK=false
-ENV NEXT_PUBLIC_NOSTR_MOCK=${NEXT_PUBLIC_NOSTR_MOCK}
 RUN pnpm run build
 
-# Stage 3: Production runner
+# Stage 3: Minimal production runner
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
