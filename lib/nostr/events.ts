@@ -47,10 +47,10 @@ export function buildProfileEvent(
 }
 
 export function buildFollowListEvent(
-  pubkeys: string[],
+  contacts: ReadonlyArray<{ pubkey: string; petname?: string }>,
   privkeyHex: string
 ): NostrEvent {
-  const tags = pubkeys.map(pk => ['p', pk])
+  const tags = contacts.map(c => ['p', c.pubkey, '', c.petname || ''])
   return signEvent(KIND_FOLLOWS, '', tags, privkeyHex)
 }
 

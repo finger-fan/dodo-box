@@ -69,19 +69,23 @@ describe('buildProfileEvent', () => {
 
 describe('buildFollowListEvent', () => {
   it('builds kind 3 event', () => {
-    const event = buildFollowListEvent([RECIPIENT.publicKey], SENDER.privateKey)
+    const event = buildFollowListEvent([{ pubkey: RECIPIENT.publicKey }], SENDER.privateKey)
     expect(event.kind).toBe(KIND_FOLLOWS)
   })
 
-  it('tags each pubkey as p', () => {
-    const pubkeys = [RECIPIENT.publicKey, generateNewIdentityKey().publicKey]
-    const event = buildFollowListEvent(pubkeys, SENDER.privateKey)
+  it('tags each pubkey as p with petname', () => {
+    const pk2 = generateNewIdentityKey().publicKey
+    const contacts = [
+      { pubkey: RECIPIENT.publicKey, petname: 'Alice' },
+      { pubkey: pk2 },
+    ]
+    const event = buildFollowListEvent(contacts, SENDER.privateKey)
     expect(event.tags).toHaveLength(2)
-    expect(event.tags[0][0]).toBe('p')
-    expect(event.tags[0][1]).toBe(pubkeys[0])
+    expect(event.tags[0]).toEqual(['p', RECIPIENT.publicKey, '', 'Alice'])
+    expect(event.tags[1]).toEqual(['p', pk2, '', ''])
   })
 
-  it('handles empty pubkey list', () => {
+  it('handles empty contact list', () => {
     const event = buildFollowListEvent([], SENDER.privateKey)
     expect(event.tags).toEqual([])
   })
