@@ -132,17 +132,22 @@ If push fails due to diverged history, stop and report — do NOT force-push.
 
 ## Step 8 — Build Docker image
 
+Build the Docker image with the version tag. This step is long-running so MUST use `run_in_background: true` on the Bash tool to avoid blocking, then use `TaskOutput` with `block: true` and `timeout: 600000` to wait for completion.
+
 ```bash
-docker compose build app
+APP_VERSION=<next> docker compose build app
 ```
 
-- Watch for build errors. If the build fails, print the error and stop — do NOT proceed to step 9.
-- The build includes `pnpm run build` (Next.js) internally via the Dockerfile.
+- CRITICAL: Use `run_in_background: true` for this Bash call — the build often takes 5-10 minutes and will otherwise time out
+- After the build completes, read the output to check for errors
+- If the build fails, print the error and stop — do NOT proceed to step 9
 
 ## Step 9 — Restart container
 
+Pass `APP_VERSION` so the container runs the correctly tagged image:
+
 ```bash
-docker compose up -d app
+APP_VERSION=<next> docker compose up -d app
 ```
 
 This recreates only the `app` service without touching the `relay` service.
@@ -150,21 +155,36 @@ This recreates only the `app` service without touching the `relay` service.
 ## Step 10 — Verify deployment
 
 ```bash
-docker compose ps
+APP_VERSION=<next> docker compose ps
 ```
 
 Confirm `dodo-box-app` shows `Up` status.
+
+Verify the image tag is correct:
+```bash
+docker inspect dodo-box-app --format '{{.Config.Image}}'
+```
 
 Optionally tail the last 20 lines of logs to catch startup errors:
 ```bash
 docker compose logs --tail=20 app
 ```
 
-## Step 11 — Return to dev branch
+## Step 11 — Merge release back into dev
+
+Switch to dev and merge release so that dev gets the version bump, changelog, and any release-only fixes:
 
 ```bash
 git checkout dev
+git pull origin dev
+git merge release --no-ff -m "merge: release v<next> into dev"
+git push origin dev
 ```
+
+If there are merge conflicts:
+- List conflicted files
+- Ask the user to resolve manually
+- Do NOT force-push or discard changes
 
 ## Step 12 — Report
 
@@ -173,7 +193,7 @@ Print a summary:
 - Tag created: vX.X.X
 - Branch pushed: release
 - Tag pushed: vX.X.X
-- Image built: success / failed
+- Image built: dodo-box:X.X.X (success / failed)
 - Container status: Up / Error
 - Access: http://127.0.0.1:18300 (internal)
 
