@@ -4,6 +4,22 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.4 — 2026-03-20
+
+### Improvements
+
+- **Dockerfile 分层优化**：builder 阶段改为 `FROM deps AS builder`，消除重复的 corepack 安装和 node_modules 拷贝层，去掉 `--mount=type=cache`（会破坏 Docker layer cache 导致每次重新 install）
+- **Docker 镜像版本标签**：`docker-compose.yml` 新增 `image: dodo-box:${APP_VERSION:-latest}`，容器运行时可通过 `docker inspect` 直接看到版本号
+- **Deploy 流程完善**：docker build 改用 `run_in_background` 避免卡死；新增 Step 11 将 release 合并回 dev，确保版本号和 CHANGELOG 同步
+
+### Changed Files
+
+- `Dockerfile` — `FROM deps AS builder` 减少层数，移除 cache mount
+- `docker-compose.yml` — 新增 `image: dodo-box:${APP_VERSION:-latest}`
+- `.claude/commands/deploy.md` — docker build 后台执行 + release 合并回 dev
+
+---
+
 ## v0.8.3 — 2026-03-20
 
 ### Improvements
