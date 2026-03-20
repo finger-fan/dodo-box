@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, act, screen, waitFor } from '@testing-library/react'
+import { render, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { NostrProvider, useNostr } from '@/contexts/NostrContext'
 import type { VaultData } from '@/lib/nostr/types'
@@ -69,7 +69,7 @@ describe('NostrProvider - initial state', () => {
     expect(ctx.session.currentPubkey).toBeNull()
   })
 
-  it('restores session from localStorage on mount', () => {
+  it('auto-logouts when session is restored but privkeys are lost', async () => {
     localStorage.setItem('dodobox_session', JSON.stringify({
       isAuthenticated: true,
       username: 'alice',
@@ -78,9 +78,13 @@ describe('NostrProvider - initial state', () => {
     }))
 
     const { captured } = renderWithProvider()
-    const ctx = captured[captured.length - 1]
-    expect(ctx.session.isAuthenticated).toBe(true)
-    expect(ctx.session.username).toBe('alice')
+
+    // After useEffect fires, session should be cleared because privkeys are lost
+    await waitFor(() => {
+      const ctx = captured[captured.length - 1]
+      expect(ctx.session.isAuthenticated).toBe(false)
+    })
+    expect(localStorage.getItem('dodobox_session')).toBeNull()
   })
 })
 
