@@ -4,6 +4,39 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.5 — 2026-03-20
+
+### Bug Fixes
+
+- **relay-client publish 确认机制**：`RelayClient.publish()` 新增 `pendingPublishes` Map，等待 relay 返回 `['OK', eventId, accepted]` 确认，超时 3s 返回 false
+- **real-adapter sendMessage await**：`RealNostrAdapter.sendMessage()` 改为 await `relayPool.publish()`，不再 fire-and-forget
+- **getMessages 单超时**：`getMessages` 只使用一个 5s 超时，消除双 resolve 问题
+- **optimistic ID 唯一性**：`useMessages` 的 optimistic ID 改用 `crypto.randomUUID()` 生成，避免快速发送时 ID 冲突
+
+### Tests
+
+- **relay-client.test.ts** (16 tests)：覆盖 `RelayClient` 和 `RelayPool` 的 publish 确认、subscribe/unsubscribe、WebSocket 连接/断开
+- **real-adapter-messages.test.ts** (10 tests)：覆盖 `sendMessage` await publish、双 gift wrap、异常处理；`getMessages` 单超时、解密过滤排序
+- **use-messages-rapid.test.tsx** (5 tests)：覆盖 10 条快速并发发送唯一 ID、部分失败保留/移除、消息顺序
+
+### Improvements
+
+- **gitignore**：新增 test artifacts 和 tsbuildinfo 排除规则
+- **bug-list 文档**：新增 `docs/bug-list-0321.md` 记录已知 bug
+
+### Changed Files
+
+- `lib/nostr/relay-client.ts` — publish 确认机制，pendingPublishes + OK 响应处理
+- `lib/nostr/real-adapter.ts` — sendMessage await publish，getMessages 单超时
+- `hooks/nostr/use-messages.ts` — optimistic ID 改用 crypto.randomUUID()
+- `lib/nostr/events.ts` — 事件构建微调
+- `lib/nostr/vault-sync.ts` — 精简重构
+- `tests/unit/lib/nostr/relay-client.test.ts` — 新增 16 个测试
+- `tests/unit/lib/nostr/real-adapter-messages.test.ts` — 新增 10 个测试
+- `tests/integration/hooks/use-messages-rapid.test.tsx` — 新增 5 个测试
+
+---
+
 ## v0.8.4 — 2026-03-20
 
 ### Improvements
