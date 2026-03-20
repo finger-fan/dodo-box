@@ -4,6 +4,31 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.3 — 2026-03-20
+
+### Improvements
+
+- **彻底移除所有 mock 适配器和假数据**：删除 `MockNostrAdapter`、`mock-data.ts` 及所有 `NEXT_PUBLIC_NOSTR_MOCK` 环境变量引用，生产环境不再出现 Alice/Bob/Charlie 假数据
+- **新增 EmptyNostrAdapter**：用于 SSR 和未认证状态，替代原来的 MockNostrAdapter fallback，所有方法返回空结果
+- **页面刷新自动登出**：新增 auto-logout useEffect，当 session 从 localStorage 恢复但私钥已丢失时自动清除 session 并跳转登录
+- **vault-sync 精简**：移除 `isMockMode()` 和 localStorage mock vault 存储逻辑，仅保留真实 relay 通信路径
+- **Discover 页面**：移除硬编码 mock 频道和帖子，初始状态为空数组
+- **测试更新**：集成测试用内联 test stub 替代 MockNostrAdapter，新增 auto-logout 行为测试
+
+### Changed Files
+
+- `lib/nostr/mock-adapter.ts` — 删除（261 行 mock 适配器）
+- `lib/mock-data.ts` — 删除（废弃的旧 mock 数据）
+- `lib/nostr/empty-adapter.ts` — 新增（轻量空适配器）
+- `lib/nostr/index.ts` — 移除 mock 导入，改用 EmptyNostrAdapter
+- `lib/nostr/vault-sync.ts` — 移除 mock 分支（-52 行）
+- `contexts/NostrContext.tsx` — 新增 auto-logout useEffect
+- `app/(main)/discover/page.tsx` — 移除 mock 频道和帖子常量
+- `Dockerfile` / `docker-compose.yml` / `.env.example` — 移除 NOSTR_MOCK 配置
+- `playwright.config.ts` / `tests/` — 移除 mock 注入，更新测试
+
+---
+
 ## v0.8.2 — 2026-03-19
 
 ### Features
