@@ -77,12 +77,6 @@ export class RealNostrAdapter implements INostrAdapter {
           senderPubkey: innerEvent.pubkey,
         })
       })
-
-      setTimeout(() => {
-        clearTimeout(timeout)
-        relayPool.unsubscribe(subId)
-        resolve(messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()))
-      }, 3000)
     })
   }
 
@@ -102,8 +96,8 @@ export class RealNostrAdapter implements INostrAdapter {
       const wrapForSelf = createGiftWrap(innerEvent, this.session.currentPubkey)
 
       await relayPool.connect(this.relayUrls)
-      relayPool.publish(wrapForRecipient)
-      relayPool.publish(wrapForSelf)
+      await relayPool.publish(wrapForRecipient)
+      await relayPool.publish(wrapForSelf)
 
       const msg: NostrMessage = {
         id: innerEvent.id,
@@ -180,18 +174,18 @@ export class RealNostrAdapter implements INostrAdapter {
       }, 5000)
 
       relayPool.subscribe(subId, filters, (event) => {
-        const pubkeys = event.tags
+        const contactTags = event.tags
           .filter(t => t[0] === 'p' && t[1])
-          .map(t => t[1])
+          .map(t => ({ pubkey: t[1], petname: t[3] || '' }))
 
-        this.contacts = pubkeys.map((pk, i) => ({
+        this.contacts = contactTags.map((ct, i) => ({
           id: `contact-${i}`,
-          name: pk.slice(0, 8) + '...',
-          pubkey: pk,
-          avatar: `https://picsum.photos/seed/${pk.slice(0, 8)}/100/100`,
+          name: ct.petname || ct.pubkey.slice(0, 8) + '...',
+          pubkey: ct.pubkey,
+          avatar: `https://picsum.photos/seed/${ct.pubkey.slice(0, 8)}/100/100`,
         }))
 
-        this.chats = this.contacts.map((c, i) => ({
+        this.chats = this.contacts.map((c) => ({
           id: c.id,
           pubkey: c.pubkey,
           name: c.name,
@@ -252,11 +246,11 @@ export class RealNostrAdapter implements INostrAdapter {
 
     this.contacts = [...this.contacts, newContact]
 
-    // Publish new kind 3 follows list
+    // Publish new kind 3 follows list with petnames
     if (this.privkey) {
       const { buildFollowListEvent } = await import('./events')
       const event = buildFollowListEvent(
-        this.contacts.map(c => c.pubkey),
+        this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
       relayPool.publish(event)
@@ -277,7 +271,7 @@ export class RealNostrAdapter implements INostrAdapter {
     if (this.privkey) {
       const { buildFollowListEvent } = await import('./events')
       const event = buildFollowListEvent(
-        this.contacts.map(c => c.pubkey),
+        this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
       relayPool.publish(event)

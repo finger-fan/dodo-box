@@ -16,6 +16,8 @@ export class VaultSync {
   }
 
   async checkVaultExists(masterPublicKey: string): Promise<boolean> {
+    await relayPool.connect(this.relayUrls)
+
     return new Promise((resolve) => {
       const subId = `vault-check-${Date.now()}`
       const filters: NostrFilter[] = [
@@ -39,11 +41,6 @@ export class VaultSync {
         relayPool.unsubscribe(subId)
         resolve(true)
       })
-
-      relayPool.connect(this.relayUrls).catch(() => {
-        clearTimeout(timeout)
-        resolve(false)
-      })
     })
   }
 
@@ -51,6 +48,8 @@ export class VaultSync {
     masterPublicKey: string,
     masterPrivateKey: string
   ): Promise<VaultData | null> {
+    await relayPool.connect(this.relayUrls)
+
     return new Promise((resolve) => {
       const subId = `vault-fetch-${Date.now()}`
       const filters: NostrFilter[] = [
@@ -81,11 +80,6 @@ export class VaultSync {
         if (!latestEvent || event.created_at > latestEvent.created_at) {
           latestEvent = event
         }
-      })
-
-      relayPool.connect(this.relayUrls).catch(() => {
-        clearTimeout(timeout)
-        resolve(null)
       })
     })
   }

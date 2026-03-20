@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use, useRef } from 'react';
+import { useState, useEffect, use, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
@@ -20,6 +20,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [chatName, setChatName] = useState('');
   const [chatAvatar, setChatAvatar] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
@@ -44,10 +45,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const adjustTextareaHeight = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, []);
+
   const handleSend = async () => {
     if (!msgInput.trim() || isSending) return;
     const text = msgInput;
     setMsgInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     await sendMessage(text);
   };
 
@@ -112,12 +123,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="p-4 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800">
         <div className="flex items-end gap-2 bg-zinc-100 dark:bg-zinc-900 rounded-2xl p-2">
           <textarea
+            ref={textareaRef}
             data-testid="message-input"
             value={msgInput}
-            onChange={(e) => setMsgInput(e.target.value)}
+            onChange={(e) => {
+              setMsgInput(e.target.value);
+              adjustTextareaHeight();
+            }}
             placeholder={t('chat.type_message')}
             rows={1}
-            className="msg-input flex-1 bg-transparent border-none focus:ring-0 text-sm text-zinc-900 dark:text-zinc-100 py-2 px-2 max-h-32 resize-none"
+            className="msg-input flex-1 bg-transparent border-none focus:ring-0 text-sm text-zinc-900 dark:text-zinc-100 py-2 px-2 max-h-32 resize-none overflow-y-auto"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

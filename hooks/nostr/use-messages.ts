@@ -37,7 +37,7 @@ export function useMessages(contactPubkey: string) {
 
       // Optimistic update
       const optimistic: NostrMessage = {
-        id: `optimistic-${Date.now()}`,
+        id: `optimistic-${crypto.randomUUID()}`,
         text,
         sender: 'me',
         timestamp: new Date(),

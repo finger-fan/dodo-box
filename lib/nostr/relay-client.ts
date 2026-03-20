@@ -11,6 +11,7 @@ export class RelayClient {
   private maxReconnectDelay = 30000
   private shouldReconnect = true
   private connected = false
+  private pendingPublishes = new Map<string, (accepted: boolean) => void>()
 
   constructor(public readonly url: string) {}
 
@@ -47,6 +48,14 @@ export class RelayClient {
               const event = msg[2] as NostrEvent
               const cb = this.subscriptions.get(subId)
               if (cb) cb(event)
+            } else if (msg[0] === 'OK' && msg[1]) {
+              const eventId = msg[1] as string
+              const accepted = msg[2] as boolean
+              const cb = this.pendingPublishes.get(eventId)
+              if (cb) {
+                cb(accepted)
+                this.pendingPublishes.delete(eventId)
+              }
             }
           } catch {
             // ignore parse errors
@@ -58,9 +67,21 @@ export class RelayClient {
     })
   }
 
-  publish(event: NostrEvent): void {
-    if (!this.ws || !this.connected) return
+  publish(event: NostrEvent): Promise<boolean> {
+    if (!this.ws || !this.connected) return Promise.resolve(false)
     this.ws.send(JSON.stringify(['EVENT', event]))
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingPublishes.delete(event.id)
+        resolve(false)
+      }, 3000)
+
+      this.pendingPublishes.set(event.id, (accepted) => {
+        clearTimeout(timeout)
+        resolve(accepted)
+      })
+    })
   }
 
   subscribe(subId: string, filters: NostrFilter[], callback: SubCallback): void {
@@ -104,10 +125,13 @@ export class RelayPool {
     await Promise.allSettled(connectPromises)
   }
 
-  publish(event: NostrEvent): void {
-    for (const client of this.clients.values()) {
-      if (client.isConnected()) client.publish(event)
-    }
+  async publish(event: NostrEvent): Promise<boolean> {
+    const results = await Promise.all(
+      Array.from(this.clients.values())
+        .filter(c => c.isConnected())
+        .map(c => c.publish(event))
+    )
+    return results.some(ok => ok)
   }
 
   subscribe(subId: string, filters: NostrFilter[], callback: SubCallback): void {
