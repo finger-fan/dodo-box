@@ -40,58 +40,10 @@ interface Post {
   comments: number;
 }
 
-const MOCK_CHANNELS: Channel[] = [
-  { id: '1', name: 'nostr', description: 'General nostr discussion', isSubscribed: true },
-  { id: '2', name: 'bitcoin', description: 'Bitcoin and lighting network', isSubscribed: true },
-  { id: '3', name: 'tech', description: 'Latest technology news', isSubscribed: false },
-  { id: '4', name: 'art', description: 'Digital and traditional art', isSubscribed: false },
-  { id: '5', name: 'music', description: 'Share your favorite tunes', isSubscribed: true },
-  { id: '6', name: 'gaming', description: 'Everything about video games', isSubscribed: false },
-];
-
-const MOCK_POSTS: Post[] = [
-  {
-    id: 'p1',
-    author: { name: 'Alice', handle: 'alice@nostr.com', avatar: 'https://picsum.photos/seed/alice/100/100' },
-    content: 'Just discovered this amazing decentralized protocol! #nostr #web3',
-    timestamp: '2h ago',
-    channelId: '1',
-    likes: 42,
-    comments: 5
-  },
-  {
-    id: 'p2',
-    author: { name: 'Bob', handle: 'bob@bitcoin.org', avatar: 'https://picsum.photos/seed/bob/100/100' },
-    content: 'Stacking sats is the way. 🚀',
-    timestamp: '4h ago',
-    channelId: '2',
-    likes: 128,
-    comments: 12
-  },
-  {
-    id: 'p3',
-    author: { name: 'Charlie', handle: 'charlie@tech.io', avatar: 'https://picsum.photos/seed/charlie/100/100' },
-    content: 'New GPU benchmarks are out. The performance jump is insane!',
-    timestamp: '5h ago',
-    channelId: '3',
-    likes: 15,
-    comments: 3
-  },
-  {
-    id: 'p4',
-    author: { name: 'Diana', handle: 'diana@music.net', avatar: 'https://picsum.photos/seed/diana/100/100' },
-    content: 'Check out this new track I found on a decentralized streaming platform.',
-    timestamp: '6h ago',
-    channelId: '5',
-    likes: 8,
-    comments: 1
-  }
-];
-
 export default function DiscoverPage() {
   const { t } = useTranslation();
   const [activeChannelId, setActiveChannelId] = useState<string>('all');
-  const [channels, setChannels] = useState<Channel[]>(MOCK_CHANNELS);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -105,9 +57,10 @@ export default function DiscoverPage() {
   if (!mounted) return null;
 
   const subscribedChannels = channels.filter(c => c.isSubscribed);
-  const filteredPosts = activeChannelId === 'all' 
-    ? MOCK_POSTS.filter(p => channels.find(c => c.id === p.channelId)?.isSubscribed)
-    : MOCK_POSTS.filter(p => p.channelId === activeChannelId);
+  const posts: Post[] = [];
+  const filteredPosts = activeChannelId === 'all'
+    ? posts.filter(p => channels.find(c => c.id === p.channelId)?.isSubscribed)
+    : posts.filter(p => p.channelId === activeChannelId);
 
   const toggleSubscription = (id: string) => {
     setChannels(prev => prev.map(c => 

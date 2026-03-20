@@ -96,6 +96,22 @@ export function NostrProvider({ children }: { children: ReactNode }) {
   const identityPrivkeyRef = useRef<string | null>(null)
   const [adapter, setAdapter] = useState<INostrAdapter>(() => createNostrAdapter())
 
+  // Auto-logout on page refresh when privkey is lost (session persisted but key in memory is gone)
+  useEffect(() => {
+    if (session.isAuthenticated && !identityPrivkeyRef.current && !masterPrivkeyRef.current) {
+      // Session was restored from localStorage but private keys are lost
+      masterPrivkeyRef.current = null
+      identityPrivkeyRef.current = null
+      setSession(EMPTY_SESSION)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_STORAGE_KEY)
+        localStorage.removeItem('dodobox_account_active')
+        localStorage.removeItem('dodobox_current_user')
+      }
+      setAdapter(createNostrAdapter())
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   function persistSession(s: NostrSession & { masterPubkey?: string }) {
     if (typeof window === 'undefined') return
     localStorage.setItem(

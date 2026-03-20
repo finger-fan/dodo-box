@@ -2,13 +2,87 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { useMessages } from '@/hooks/nostr/use-messages'
-import { MockNostrAdapter } from '@/lib/nostr/mock-adapter'
 import { NostrContext } from '@/contexts/NostrContext'
-import type { NostrSession, INostrAdapter } from '@/lib/nostr/types'
+import type {
+  NostrSession,
+  INostrAdapter,
+  NostrChat,
+  NostrMessage,
+  NostrContact,
+  NostrProfile,
+  NostrResult,
+} from '@/lib/nostr/types'
 
-// Export NostrContext for testing
-// Note: We need access to the internal context
 const ALICE_PUBKEY = 'a'.repeat(64)
+
+const STUB_MESSAGES: NostrMessage[] = [
+  {
+    id: '1',
+    text: 'Hey there!',
+    sender: 'them',
+    timestamp: new Date(Date.now() - 3600000),
+    senderPubkey: ALICE_PUBKEY,
+  },
+  {
+    id: '2',
+    text: 'Hello! How are you?',
+    sender: 'me',
+    timestamp: new Date(Date.now() - 3000000),
+  },
+]
+
+function createTestAdapter(): INostrAdapter {
+  const messages = new Map<string, NostrMessage[]>([
+    [ALICE_PUBKEY, [...STUB_MESSAGES]],
+  ])
+
+  return {
+    async getChats(): Promise<NostrChat[]> {
+      return []
+    },
+    async getMessages(contactPubkey: string): Promise<NostrMessage[]> {
+      return [...(messages.get(contactPubkey) || [])]
+    },
+    async sendMessage(
+      contactPubkey: string,
+      text: string
+    ): Promise<NostrResult<NostrMessage>> {
+      const msg: NostrMessage = {
+        id: Date.now().toString(),
+        text,
+        sender: 'me',
+        timestamp: new Date(),
+      }
+      const existing = messages.get(contactPubkey) || []
+      messages.set(contactPubkey, [...existing, msg])
+      return { success: true, data: msg }
+    },
+    subscribeToMessages(): () => void {
+      return () => {}
+    },
+    async getContacts(): Promise<NostrContact[]> {
+      return []
+    },
+    async addContact(): Promise<NostrResult<NostrContact>> {
+      return { success: false, error: 'Not implemented' }
+    },
+    async removeContact(): Promise<NostrResult> {
+      return { success: false, error: 'Not implemented' }
+    },
+    async getProfile(): Promise<NostrProfile | null> {
+      return null
+    },
+    async updateProfile(): Promise<NostrResult> {
+      return { success: true, data: undefined }
+    },
+    getRelays(): string[] {
+      return []
+    },
+    async setRelays(): Promise<NostrResult> {
+      return { success: true, data: undefined }
+    },
+  }
+}
 
 const TEST_SESSION: NostrSession = {
   isAuthenticated: true,
@@ -40,10 +114,10 @@ function makeWrapper(adapter: INostrAdapter, session: NostrSession = TEST_SESSIO
 }
 
 describe('useMessages', () => {
-  let adapter: MockNostrAdapter
+  let adapter: INostrAdapter
 
   beforeEach(() => {
-    adapter = new MockNostrAdapter()
+    adapter = createTestAdapter()
   })
 
   it('loads existing messages on mount', async () => {
@@ -125,7 +199,7 @@ describe('useMessages', () => {
   })
 
   it('sendMessage removes optimistic message on adapter failure', async () => {
-    const failAdapter = new MockNostrAdapter()
+    const failAdapter = createTestAdapter()
     vi.spyOn(failAdapter, 'sendMessage').mockResolvedValue({
       success: false,
       error: 'Network error',
@@ -148,8 +222,8 @@ describe('useMessages', () => {
   })
 
   it('isSending is true during send, false after', async () => {
-    let resolveMsg: (v: Awaited<ReturnType<typeof adapter.sendMessage>>) => void
-    const slowAdapter = new MockNostrAdapter()
+    let resolveMsg: (v: NostrResult<NostrMessage>) => void
+    const slowAdapter = createTestAdapter()
     vi.spyOn(slowAdapter, 'sendMessage').mockReturnValue(
       new Promise(r => { resolveMsg = r })
     )

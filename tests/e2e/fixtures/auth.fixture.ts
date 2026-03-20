@@ -17,7 +17,6 @@ export const AUTH_SESSION = {
 export async function injectAuthSession(page: Page): Promise<void> {
   await page.addInitScript((session) => {
     localStorage.setItem('dodobox_session', JSON.stringify(session))
-    localStorage.setItem('dodobox_nostr_mock', 'true')
   }, AUTH_SESSION)
 }
 
@@ -27,6 +26,5 @@ export async function injectAuthSession(page: Page): Promise<void> {
 export async function clearAuthSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.removeItem('dodobox_session')
-    localStorage.removeItem('dodobox_nostr_mock')
   })
 }
