@@ -18,6 +18,10 @@ export class VaultSync {
   async checkVaultExists(masterPublicKey: string): Promise<boolean> {
     await relayPool.connect(this.relayUrls)
 
+    if (relayPool.getConnectedRelays().length === 0) {
+      return false
+    }
+
     return new Promise((resolve) => {
       const subId = `vault-check-${Date.now()}`
       const filters: NostrFilter[] = [
@@ -33,13 +37,20 @@ export class VaultSync {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(found)
-      }, 5000)
+      }, 10000)
 
       relayPool.subscribe(subId, filters, () => {
         found = true
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
         resolve(true)
+      }, () => {
+        // onEose: relay finished sending stored events
+        if (!found) {
+          clearTimeout(timeout)
+          relayPool.unsubscribe(subId)
+          resolve(false)
+        }
       })
     })
   }
@@ -49,6 +60,10 @@ export class VaultSync {
     masterPrivateKey: string
   ): Promise<VaultData | null> {
     await relayPool.connect(this.relayUrls)
+
+    if (relayPool.getConnectedRelays().length === 0) {
+      return null
+    }
 
     return new Promise((resolve) => {
       const subId = `vault-fetch-${Date.now()}`
@@ -62,7 +77,11 @@ export class VaultSync {
       ]
 
       let latestEvent: { created_at: number; content: string } | null = null
-      const timeout = setTimeout(async () => {
+      let resolved = false
+
+      const resolveWithLatest = async () => {
+        if (resolved) return
+        resolved = true
         relayPool.unsubscribe(subId)
         if (!latestEvent) {
           resolve(null)
@@ -74,12 +93,18 @@ export class VaultSync {
         } catch {
           resolve(null)
         }
-      }, 5000)
+      }
+
+      const timeout = setTimeout(resolveWithLatest, 10000)
 
       relayPool.subscribe(subId, filters, (event) => {
         if (!latestEvent || event.created_at > latestEvent.created_at) {
           latestEvent = event
         }
+      }, () => {
+        // onEose: relay finished, process immediately
+        clearTimeout(timeout)
+        resolveWithLatest()
       })
     })
   }

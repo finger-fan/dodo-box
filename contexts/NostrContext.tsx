@@ -19,6 +19,7 @@ import {
   removeIdentityFromVault,
 } from '@/lib/nostr/vault-crypto'
 import { vaultSync } from '@/lib/nostr/vault-sync'
+import { relayPool } from '@/lib/nostr/relay-client'
 import { createNostrAdapter } from '@/lib/nostr'
 import type {
   NostrSession,
@@ -148,7 +149,11 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       )
 
       if (!vaultData) {
-        return { success: false, error: 'Account not found' }
+        const connected = relayPool.getConnectedRelays().length
+        const error = connected === 0
+          ? 'No relay connection. Check your network and try again.'
+          : 'Account not found'
+        return { success: false, error }
       }
 
       // Pick first identity or use master key as fallback

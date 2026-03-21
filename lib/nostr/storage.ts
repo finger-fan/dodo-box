@@ -1,9 +1,9 @@
 // storage.ts - IndexedDB 事件缓存
 
-import type { NostrEvent } from './types'
+import type { NostrEvent, NostrContact } from './types'
 
 const DB_NAME = 'dodobox'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const MAX_EVENTS = 10000
 
 export class NostrStorage {
@@ -25,6 +25,10 @@ export class NostrStorage {
 
         if (!db.objectStoreNames.contains('plaintext')) {
           db.createObjectStore('plaintext', { keyPath: 'eventId' })
+        }
+
+        if (!db.objectStoreNames.contains('contacts')) {
+          db.createObjectStore('contacts', { keyPath: 'pubkey' })
         }
       }
 
@@ -78,6 +82,31 @@ export class NostrStorage {
       const store = tx.objectStore('plaintext')
       const req = store.get(eventId)
       req.onsuccess = () => resolve(req.result?.plaintext || null)
+      req.onerror = () => reject(req.error)
+    })
+  }
+
+  async saveContacts(contacts: NostrContact[]): Promise<void> {
+    if (!this.db) return
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction('contacts', 'readwrite')
+      const store = tx.objectStore('contacts')
+      store.clear()
+      for (const contact of contacts) {
+        store.put(contact)
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async getContacts(): Promise<NostrContact[]> {
+    if (!this.db) return []
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction('contacts', 'readonly')
+      const store = tx.objectStore('contacts')
+      const req = store.getAll()
+      req.onsuccess = () => resolve(req.result as NostrContact[])
       req.onerror = () => reject(req.error)
     })
   }

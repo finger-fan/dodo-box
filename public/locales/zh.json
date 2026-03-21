@@ -37,7 +37,14 @@
     "new_identity_created": "新身份已创建",
     "identity_updated": "身份名称已更新",
     "delete_identity": "删除身份",
-    "delete_confirm": "确定要删除此身份吗？所有相关的本地数据都将丢失。"
+    "delete_confirm": "确定要删除此身份吗？所有相关的本地数据都将丢失。",
+    "ttl_10min": "10 分钟",
+    "ttl_30min": "30 分钟",
+    "ttl_1hour": "1 小时",
+    "ttl_1day": "1 天",
+    "ttl_15days": "15 天",
+    "ttl_30days": "30 天",
+    "ttl_permanent": "永久"
   },
   "contacts": {
     "add_contact": "添加联系人",

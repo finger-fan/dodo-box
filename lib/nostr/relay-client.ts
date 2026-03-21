@@ -3,10 +3,12 @@
 import type { NostrFilter, NostrEvent } from './types'
 
 type SubCallback = (event: NostrEvent) => void
+type EoseCallback = () => void
 
 export class RelayClient {
   private ws: WebSocket | null = null
   private subscriptions = new Map<string, SubCallback>()
+  private eoseCallbacks = new Map<string, EoseCallback>()
   private reconnectDelay = 1000
   private maxReconnectDelay = 30000
   private shouldReconnect = true
@@ -48,6 +50,10 @@ export class RelayClient {
               const event = msg[2] as NostrEvent
               const cb = this.subscriptions.get(subId)
               if (cb) cb(event)
+            } else if (msg[0] === 'EOSE' && msg[1]) {
+              const subId = msg[1] as string
+              const cb = this.eoseCallbacks.get(subId)
+              if (cb) cb()
             } else if (msg[0] === 'OK' && msg[1]) {
               const eventId = msg[1] as string
               const accepted = msg[2] as boolean
@@ -84,14 +90,16 @@ export class RelayClient {
     })
   }
 
-  subscribe(subId: string, filters: NostrFilter[], callback: SubCallback): void {
+  subscribe(subId: string, filters: NostrFilter[], callback: SubCallback, onEose?: EoseCallback): void {
     if (!this.ws || !this.connected) return
     this.subscriptions.set(subId, callback)
+    if (onEose) this.eoseCallbacks.set(subId, onEose)
     this.ws.send(JSON.stringify(['REQ', subId, ...filters]))
   }
 
   unsubscribe(subId: string): void {
     this.subscriptions.delete(subId)
+    this.eoseCallbacks.delete(subId)
     if (this.ws && this.connected) {
       this.ws.send(JSON.stringify(['CLOSE', subId]))
     }
@@ -134,9 +142,16 @@ export class RelayPool {
     return results.some(ok => ok)
   }
 
-  subscribe(subId: string, filters: NostrFilter[], callback: SubCallback): void {
+  subscribe(subId: string, filters: NostrFilter[], callback: SubCallback, onEose?: EoseCallback): void {
+    let eoseFired = false
+    const wrappedEose = onEose ? () => {
+      if (!eoseFired) {
+        eoseFired = true
+        onEose()
+      }
+    } : undefined
     for (const client of this.clients.values()) {
-      if (client.isConnected()) client.subscribe(subId, filters, callback)
+      if (client.isConnected()) client.subscribe(subId, filters, callback, wrappedEose)
     }
   }
 

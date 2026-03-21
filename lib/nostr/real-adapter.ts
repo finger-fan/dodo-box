@@ -13,6 +13,7 @@ import type {
 import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './events'
 import { relayPool } from './relay-client'
+import { nostrStorage } from './storage'
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -156,6 +157,10 @@ export class RealNostrAdapter implements INostrAdapter {
   async getContacts(): Promise<NostrContact[]> {
     if (!this.session.currentPubkey) return []
 
+    // Load cached contacts for name fallback
+    const cached = await nostrStorage.getContacts()
+    const cachedNameMap = new Map(cached.map(c => [c.pubkey, c.name]))
+
     const filters: NostrFilter[] = [
       {
         kinds: [KIND_FOLLOWS],
@@ -170,6 +175,11 @@ export class RealNostrAdapter implements INostrAdapter {
       const subId = `contacts-${Date.now()}`
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
+        // On timeout, return cached contacts if we have them
+        if (this.contacts.length === 0 && cached.length > 0) {
+          this.contacts = cached
+          this.rebuildChats()
+        }
         resolve(this.contacts)
       }, 5000)
 
@@ -180,26 +190,33 @@ export class RealNostrAdapter implements INostrAdapter {
 
         this.contacts = contactTags.map((ct, i) => ({
           id: `contact-${i}`,
-          name: ct.petname || ct.pubkey.slice(0, 8) + '...',
+          name: ct.petname || cachedNameMap.get(ct.pubkey) || ct.pubkey.slice(0, 8) + '...',
           pubkey: ct.pubkey,
           avatar: `https://picsum.photos/seed/${ct.pubkey.slice(0, 8)}/100/100`,
         }))
 
-        this.chats = this.contacts.map((c) => ({
-          id: c.id,
-          pubkey: c.pubkey,
-          name: c.name,
-          lastMsg: '',
-          time: '',
-          unread: 0,
-          avatar: c.avatar || '',
-        }))
+        this.rebuildChats()
+
+        // Persist to cache
+        nostrStorage.saveContacts(this.contacts).catch(() => {})
 
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
         resolve(this.contacts)
       })
     })
+  }
+
+  private rebuildChats(): void {
+    this.chats = this.contacts.map((c) => ({
+      id: c.id,
+      pubkey: c.pubkey,
+      name: c.name,
+      lastMsg: '',
+      time: '',
+      unread: 0,
+      avatar: c.avatar || '',
+    }))
   }
 
   async addContact(pubkeyOrNpub: string): Promise<NostrResult<NostrContact>> {
@@ -245,6 +262,7 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     this.contacts = [...this.contacts, newContact]
+    nostrStorage.saveContacts(this.contacts).catch(() => {})
 
     // Publish new kind 3 follows list with petnames
     if (this.privkey) {
@@ -263,6 +281,7 @@ export class RealNostrAdapter implements INostrAdapter {
     const before = this.contacts.length
     this.contacts = this.contacts.filter(c => c.pubkey !== pubkey)
     this.chats = this.chats.filter(c => c.pubkey !== pubkey)
+    nostrStorage.saveContacts(this.contacts).catch(() => {})
 
     if (this.contacts.length === before) {
       return { success: false, error: 'Contact not found' }

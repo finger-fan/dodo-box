@@ -3,20 +3,29 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Shield, UserPlus, LogIn, ArrowRight, User, Lock } from 'lucide-react';
+import { Shield, UserPlus, LogIn, ArrowRight, User, Lock, Moon, Sun, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Toast from '@/components/ui/Toast';
 import { useNostr } from '@/contexts/NostrContext';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from 'next-themes';
 import { version } from '@/package.json';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, register, session } = useNostr();
+  const { i18n } = useTranslation();
+  const { resolvedTheme, setTheme } = useTheme();
   const [view, setView] = useState<'initial' | 'login' | 'register'>('initial');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (session.isAuthenticated) {
@@ -51,6 +60,28 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6">
+      {mounted && (
+        <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
+          <button
+            onClick={() => {
+              const next = i18n.language === 'en' ? 'zh' : 'en';
+              i18n.changeLanguage(next);
+              localStorage.setItem('dodobox_language', next);
+            }}
+            className="p-2 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+            aria-label="Toggle language"
+          >
+            <Globe className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            className="p-2 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+            aria-label="Toggle theme"
+          >
+            {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
           <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-emerald-200 dark:shadow-none">

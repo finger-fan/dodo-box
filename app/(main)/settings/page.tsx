@@ -32,11 +32,15 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [relays, setRelays] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [messageTtl, setMessageTtl] = useState(2592000);
+  const [isTtlOpen, setIsTtlOpen] = useState(false);
 
   useEffect(() => {
     requestAnimationFrame(() => {
       setMounted(true);
       setRelays(adapter.getRelays());
+      const savedTtl = localStorage.getItem('dodobox_message_ttl');
+      if (savedTtl) setMessageTtl(Number(savedTtl));
     });
   }, [adapter]);
 
@@ -102,8 +106,27 @@ export default function SettingsPage() {
     setToast({ message: t('common.copy_success', 'Identity copied for sharing'), type: 'success' });
   };
 
+  const TTL_OPTIONS = [
+    { value: 600, labelKey: 'settings.ttl_10min' },
+    { value: 1800, labelKey: 'settings.ttl_30min' },
+    { value: 3600, labelKey: 'settings.ttl_1hour' },
+    { value: 86400, labelKey: 'settings.ttl_1day' },
+    { value: 1296000, labelKey: 'settings.ttl_15days' },
+    { value: 2592000, labelKey: 'settings.ttl_30days' },
+    { value: 0, labelKey: 'settings.ttl_permanent' },
+  ];
+
+  const handleTtlChange = (value: number) => {
+    setMessageTtl(value);
+    localStorage.setItem('dodobox_message_ttl', String(value));
+    setIsTtlOpen(false);
+  };
+
+  const currentTtlLabel = TTL_OPTIONS.find(o => o.value === messageTtl)?.labelKey || 'settings.ttl_30days';
+
   const handleLanguageChange = (lang: string) => {
     i18n.changeLanguage(lang);
+    localStorage.setItem('dodobox_language', lang);
   };
 
   if (!mounted) return null;
@@ -208,12 +231,37 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.message_ttl')}</span>
+            <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.message_ttl')}</span>
+                </div>
+                <button
+                  onClick={() => setIsTtlOpen(!isTtlOpen)}
+                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                >
+                  {t(currentTtlLabel)}
+                </button>
               </div>
-              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">30 Days</span>
+              {isTtlOpen && (
+                <div className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                  {TTL_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleTtlChange(option.value)}
+                      className={cn(
+                        "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                        messageTtl === option.value
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold"
+                          : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                      )}
+                    >
+                      {t(option.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="p-4 flex gap-2">
               <button className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
