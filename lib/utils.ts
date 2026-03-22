@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { decode, npubEncode } from 'nostr-tools/nip19';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -15,7 +16,6 @@ export function decodeContactInfo(protocolStr: string): string | null {
 
   if (encoded.startsWith('npub1')) {
     try {
-      const { decode } = require('nostr-tools/nip19');
       const decoded = decode(encoded);
       if (decoded.type === 'npub') return decoded.data as string;
     } catch {
@@ -112,11 +112,17 @@ export function decodeIdentityInfo(protocolStr: string): { pubkey: string; nickn
 }
 
 /**
+ * Generate a default avatar URL from a pubkey
+ */
+export function defaultAvatar(pubkey: string): string {
+  return `https://picsum.photos/seed/${pubkey.slice(0, 8)}/100/100`
+}
+
+/**
  * Format a pubkey hex as short display string
  */
 export function shortPubkey(pubkeyHex: string): string {
   try {
-    const { npubEncode } = require('nostr-tools/nip19');
     const npub = npubEncode(pubkeyHex);
     return `${npub.slice(0, 8)}...${npub.slice(-4)}`;
   } catch {

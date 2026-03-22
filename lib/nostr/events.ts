@@ -72,7 +72,6 @@ export function createGiftWrap(
 ): NostrEvent {
   const wrapPrivkey = generateSecretKey()
   const wrapPrivkeyHex = bytesToHex(wrapPrivkey)
-  const wrapPubkey = getPublicKey(wrapPrivkey)
 
   const conversationKey = nip44.getConversationKey(
     wrapPrivkey,

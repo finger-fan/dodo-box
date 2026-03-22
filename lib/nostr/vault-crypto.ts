@@ -7,6 +7,9 @@ import { VAULT_ERROR_CODES, VaultError } from './types'
 import type { VaultData, VaultIdentity } from './types'
 
 const IV_LENGTH = 12
+const PBKDF2_ITERATIONS = 100000
+const AES_KEY_LENGTH = 256
+const PBKDF2_SALT = 'vault-aes-key-derivation'
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
@@ -23,16 +26,16 @@ async function deriveAesKey(masterPrivateKey: string): Promise<CryptoKey> {
     ['deriveKey']
   )
 
-  const salt = new TextEncoder().encode('vault-aes-key-derivation')
+  const salt = new TextEncoder().encode(PBKDF2_SALT)
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt,
-      iterations: 100000,
+      iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
     keyMaterial,
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: AES_KEY_LENGTH },
     false,
     ['encrypt', 'decrypt']
   )

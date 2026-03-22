@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Image from 'next/image';
 import { 
-  Compass, 
-  Hash, 
-  Plus, 
-  Settings2, 
+  Compass,
+  Hash,
+  Settings2,
   Search, 
   Check, 
   MoreHorizontal,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useMounted } from '@/hooks/use-mounted';
 
 interface Channel {
   id: string;
@@ -46,21 +46,12 @@ export default function DiscoverPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-    });
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) return null;
 
   const subscribedChannels = channels.filter(c => c.isSubscribed);
-  const posts: Post[] = [];
-  const filteredPosts = activeChannelId === 'all'
-    ? posts.filter(p => channels.find(c => c.id === p.channelId)?.isSubscribed)
-    : posts.filter(p => p.channelId === activeChannelId);
+  const filteredPosts: Post[] = [];
 
   const toggleSubscription = (id: string) => {
     setChannels(prev => prev.map(c => 

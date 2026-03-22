@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Camera, X, Users } from 'lucide-react';
@@ -10,6 +10,8 @@ import SwipeableListItem from '@/components/ui/SwipeableListItem';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
 import { useContacts } from '@/hooks/nostr/use-contacts';
+import { useMounted } from '@/hooks/use-mounted';
+import { defaultAvatar } from '@/lib/utils';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -19,14 +21,9 @@ export default function ContactsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [contactInput, setContactInput] = useState('');
   const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [editingName, setEditingName] = useState('');
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
 
   const filteredContacts = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -128,7 +125,7 @@ export default function ContactsPage() {
               >
                 <div className="w-12 h-12 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-800 relative">
                   <Image
-                    src={contact.avatar || `https://picsum.photos/seed/${contact.pubkey.slice(0, 8)}/100/100`}
+                    src={contact.avatar || defaultAvatar(contact.pubkey)}
                     alt={contact.name}
                     fill
                     className="object-cover"

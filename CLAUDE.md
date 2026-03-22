@@ -1,6 +1,31 @@
 # CLAUDE.md
 
-为 Claude Code (claude.ai/code) 提供本仓库的代码导航指引。
+本文件为 Claude Code (claude.ai/code) 提供本仓库的代码导航和操作指引，**所有规则必须严格遵守**。
+
+---
+
+## 代码质量规则
+- 每次修改代码后必须运行 lint 和类型检查
+- 提交代码前必须修复所有 TypeScript 错误
+- 未经明确批准，不得对现有功能进行破坏性变更
+
+## 工作偏好
+- 当要求分析代码时，必须先阅读代码本身 - 不要截图或探索 UI
+- 按照功能重要性优先排序实现，而不是按难度
+- 如果提供了计划/PRD，请直接按照实现 - 不要反复修改计划
+- 未经明确批准，永远不要升级 major 版本依赖（例如 Svelte 4→5）
+
+## 测试协议
+- 修改相关模块后必须运行自动化测试
+- E2E 测试时：除非明确确认要删除，否则永远不要误点删除按钮，始终先关闭确认对话框
+- 单账户和多账户场景的测试流程需要在单独文件中记录
+
+## Git 工作流
+- 提交代码前必须确认当前所在分支
+- 使用规范化的提交信息（conventional commit）
+- 提交成功后默认推送到远程，除非另有说明
+
+---
 
 ## 项目概述
 
@@ -9,13 +34,29 @@
 ## 命令
 
 ```bash
-npm run dev      # 启动开发服务器 (Next.js)
-npm run build    # 生产构建
-npm run lint     # ESLint 检查
-npm run clean    # 清除 Next.js 缓存
+pnpm dev           # 启动开发服务器 (Next.js)
+pnpm build         # 生产构建
+pnpm lint          # ESLint 检查
+pnpm clean         # 清除 Next.js 缓存
+pnpm check         # 类型检查 + lint
+pnpm test          # Vitest 单元/集成测试
+pnpm test:coverage # 带覆盖率的测试
+pnpm test:e2e      # Playwright E2E 测试
+pnpm test:all      # 运行全部测试
 ```
 
-尚未配置测试框架。
+**包管理器**: 必须使用 **pnpm**（不是 npm）。Docker 构建也必须使用 pnpm。
+
+## 操作规则
+
+以下规则基于历史会话中反复出现的问题总结，**必须遵守**：
+
+1. **调试时先查日志**: 调试问题时，必须先检查容器/服务日志（`docker compose logs`），再提出修复方案。禁止用中间件屏蔽错误——找到并修复根因。
+2. **不要擅自触发构建**: 除非明确要求，不要触发 `pnpm build` 或 `docker compose build`。重命名/重构操作后，先确认再构建。
+3. **探索参考目录**: 当 `./ref` 或参考目录存在时，实现前必须先探索其内容。检查 memory/CLAUDE.md 中的 TODO 和计划。
+4. **Docker 构建禁止 `--mount=type=cache`**: 会破坏层缓存，导致每次全量重建。
+5. **release 必须合并回 dev**: 合并到 release 分支后，必须合并回 dev，绝不跳过。
+6. **使用 systemctl 管理服务**: 永远使用 `systemctl` 管理服务，禁止直接 kill 进程。
 
 ## 架构
 

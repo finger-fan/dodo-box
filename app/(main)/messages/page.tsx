@@ -1,23 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useChats } from '@/hooks/nostr/use-chats';
+import { useMounted } from '@/hooks/use-mounted';
 
 export default function MessagesPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { chats } = useChats();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-    });
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) return null;
 

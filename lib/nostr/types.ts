@@ -1,7 +1,6 @@
 // types.ts - Nostr 相关类型定义
 
 export const VAULT_SALT = process.env.NEXT_PUBLIC_VAULT_SALT || 'dodobox-vault-v1'
-export const VAULT_EVENT_KIND = 31990
 export const VAULT_EVENT_D_TAG = 'doracle-vault'
 
 export const KIND_PROFILE = 0

@@ -7,7 +7,6 @@ export * from './vault-sync'
 export * from './events'
 export * from './empty-adapter'
 export * from './real-adapter'
-export * from './storage'
 
 import { EmptyNostrAdapter } from './empty-adapter'
 import { RealNostrAdapter } from './real-adapter'

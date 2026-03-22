@@ -195,7 +195,7 @@ describe('useMessages', () => {
     })
 
     expect(resultValue!.success).toBe(false)
-    expect(resultValue!.error).toBeTruthy()
+    expect(!resultValue!.success && resultValue!.error).toBeTruthy()
   })
 
   it('sendMessage removes optimistic message on adapter failure', async () => {

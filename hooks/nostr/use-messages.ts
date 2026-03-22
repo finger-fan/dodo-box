@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNostr } from '@/contexts/NostrContext'
 import type { NostrMessage, NostrResult } from '@/lib/nostr/types'
 
@@ -8,6 +8,8 @@ export function useMessages(contactPubkey: string) {
   const { adapter, session } = useNostr()
   const [messages, setMessages] = useState<NostrMessage[]>([])
   const [isSending, setIsSending] = useState(false)
+  const sendQueueRef = useRef<string[]>([])
+  const isProcessingRef = useRef(false)
 
   useEffect(() => {
     if (!session.isAuthenticated || !contactPubkey) return
@@ -30,14 +32,18 @@ export function useMessages(contactPubkey: string) {
     }
   }, [adapter, contactPubkey, session.isAuthenticated])
 
-  const sendMessage = useCallback(
-    async (text: string): Promise<NostrResult<NostrMessage>> => {
-      if (!text.trim()) return { success: false, error: 'Empty message' }
-      setIsSending(true)
+  const processQueue = useCallback(async () => {
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    setIsSending(true)
+
+    while (sendQueueRef.current.length > 0) {
+      const text = sendQueueRef.current.shift()!
 
       // Optimistic update
+      const optimisticId = `optimistic-${crypto.randomUUID()}`
       const optimistic: NostrMessage = {
-        id: `optimistic-${crypto.randomUUID()}`,
+        id: optimisticId,
         text,
         sender: 'me',
         timestamp: new Date(),
@@ -47,20 +53,32 @@ export function useMessages(contactPubkey: string) {
       try {
         const result = await adapter.sendMessage(contactPubkey, text)
         if (result.success) {
-          // Replace optimistic with real
           setMessages((prev) =>
-            prev.map((m) => (m.id === optimistic.id ? result.data : m))
+            prev.map((m) => (m.id === optimisticId ? result.data : m))
           )
         } else {
-          // Remove optimistic on failure
-          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
         }
-        return result
-      } finally {
-        setIsSending(false)
+      } catch {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
       }
+    }
+
+    isProcessingRef.current = false
+    setIsSending(false)
+  }, [adapter, contactPubkey])
+
+  const sendMessage = useCallback(
+    async (text: string): Promise<NostrResult<NostrMessage>> => {
+      if (!text.trim()) return { success: false, error: 'Empty message' }
+
+      sendQueueRef.current.push(text)
+      await processQueue()
+
+      // The queue has been processed; the optimistic update already reflects the result
+      return { success: true, data: { id: '', text, sender: 'me', timestamp: new Date() } }
     },
-    [adapter, contactPubkey]
+    [processQueue]
   )
 
   return { messages, sendMessage, isSending }

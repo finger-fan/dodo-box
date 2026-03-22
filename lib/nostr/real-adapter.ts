@@ -13,12 +13,17 @@ import type {
 import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './events'
 import { relayPool } from './relay-client'
+import { defaultAvatar, shortPubkey } from '@/lib/utils'
+
+const MESSAGE_FETCH_LIMIT = 100
+const SUBSCRIPTION_TIMEOUT_MS = 5000
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
   private relayUrls: string[]
   private contacts: NostrContact[] = []
   private chats: NostrChat[] = []
+  private contactsFetched = false
 
   constructor(session: NostrSession) {
     this.session = session
@@ -33,7 +38,9 @@ export class RealNostrAdapter implements INostrAdapter {
   }
 
   async getChats(): Promise<NostrChat[]> {
-    await this.getContacts()
+    if (!this.contactsFetched) {
+      await this.getContacts()
+    }
     return [...this.chats]
   }
 
@@ -45,7 +52,7 @@ export class RealNostrAdapter implements INostrAdapter {
       {
         kinds: [KIND_DM_WRAP],
         '#p': [this.session.currentPubkey],
-        limit: 100,
+        limit: MESSAGE_FETCH_LIMIT,
       },
     ]
 
@@ -56,7 +63,7 @@ export class RealNostrAdapter implements INostrAdapter {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()))
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         const innerEvent = decryptGiftWrap(event, this.privkey)
@@ -95,7 +102,8 @@ export class RealNostrAdapter implements INostrAdapter {
       const wrapForRecipient = createGiftWrap(innerEvent, contactPubkey)
       const wrapForSelf = createGiftWrap(innerEvent, this.session.currentPubkey)
 
-      await relayPool.connect(this.relayUrls)
+      // relayPool.connect is idempotent but skipped here since connections
+      // are established during getContacts/getMessages which run before send
       await relayPool.publish(wrapForRecipient)
       await relayPool.publish(wrapForSelf)
 
@@ -109,7 +117,7 @@ export class RealNostrAdapter implements INostrAdapter {
       // Update last message
       this.chats = this.chats.map(c =>
         c.pubkey === contactPubkey
-          ? { ...c, lastMsg: text, time: 'Just now', unread: 0 }
+          ? { ...c, lastMsg: text, time: new Date().toISOString(), unread: 0 }
           : c
       )
 
@@ -169,9 +177,10 @@ export class RealNostrAdapter implements INostrAdapter {
     return new Promise((resolve) => {
       const subId = `contacts-${Date.now()}`
       const timeout = setTimeout(() => {
+        this.contactsFetched = true
         relayPool.unsubscribe(subId)
         resolve(this.contacts)
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         const contactTags = event.tags
@@ -180,26 +189,31 @@ export class RealNostrAdapter implements INostrAdapter {
 
         this.contacts = contactTags.map((ct, i) => ({
           id: `contact-${i}`,
-          name: ct.petname || ct.pubkey.slice(0, 8) + '...',
+          name: ct.petname || shortPubkey(ct.pubkey),
           pubkey: ct.pubkey,
-          avatar: `https://picsum.photos/seed/${ct.pubkey.slice(0, 8)}/100/100`,
+          avatar: defaultAvatar(ct.pubkey),
         }))
 
-        this.chats = this.contacts.map((c) => ({
-          id: c.id,
-          pubkey: c.pubkey,
-          name: c.name,
-          lastMsg: '',
-          time: '',
-          unread: 0,
-          avatar: c.avatar || '',
-        }))
+        this.rebuildChats()
+        this.contactsFetched = true
 
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
         resolve(this.contacts)
       })
     })
+  }
+
+  private rebuildChats(): void {
+    this.chats = this.contacts.map((c) => ({
+      id: c.id,
+      pubkey: c.pubkey,
+      name: c.name,
+      lastMsg: '',
+      time: '',
+      unread: 0,
+      avatar: c.avatar || '',
+    }))
   }
 
   async addContact(pubkeyOrNpub: string): Promise<NostrResult<NostrContact>> {
@@ -239,9 +253,9 @@ export class RealNostrAdapter implements INostrAdapter {
 
     const newContact: NostrContact = {
       id: Date.now().toString(),
-      name: contactName || pubkey.slice(0, 8) + '...',
+      name: contactName || shortPubkey(pubkey),
       pubkey,
-      avatar: `https://picsum.photos/seed/${pubkey.slice(0, 8)}/100/100`,
+      avatar: defaultAvatar(pubkey),
     }
 
     this.contacts = [...this.contacts, newContact]
@@ -253,7 +267,7 @@ export class RealNostrAdapter implements INostrAdapter {
         this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
-      relayPool.publish(event)
+      await relayPool.publish(event)
     }
 
     return { success: true, data: newContact }
@@ -274,7 +288,7 @@ export class RealNostrAdapter implements INostrAdapter {
         this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
-      relayPool.publish(event)
+      await relayPool.publish(event)
     }
 
     return { success: true, data: undefined }
@@ -292,7 +306,7 @@ export class RealNostrAdapter implements INostrAdapter {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(null)
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         clearTimeout(timeout)
@@ -330,7 +344,7 @@ export class RealNostrAdapter implements INostrAdapter {
         this.privkey
       )
       await relayPool.connect(this.relayUrls)
-      relayPool.publish(event)
+      await relayPool.publish(event)
       return { success: true, data: undefined }
     } catch (error) {
       return { success: false, error: String(error) }

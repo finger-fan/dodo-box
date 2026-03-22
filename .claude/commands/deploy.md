@@ -207,3 +207,8 @@ Print a summary:
 - NEVER bump minor or major versions — only patch
 - If `docker compose build` fails, stop and report the error without running `up`
 - Return to `dev` branch after deployment completes
+- NEVER skip merging release back to dev (Step 11) — this is the most commonly forgotten step
+- NEVER use `--mount=type=cache` in Dockerfile — it breaks layer caching
+- NEVER kill processes directly — use `systemctl` for service management
+- If deployment fails, check `docker compose logs` FIRST before proposing fixes
+- Use `pnpm` (not `npm`) for all package operations including Docker builds

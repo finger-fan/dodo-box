@@ -17,6 +17,11 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    detection: {
+      order: ['localStorage', 'navigator'],
+      lookupLocalStorage: 'dodobox_language',
+      caches: ['localStorage'],
+    },
   });
 
 export default i18n;

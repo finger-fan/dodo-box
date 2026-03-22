@@ -37,7 +37,17 @@
     "new_identity_created": "New identity created",
     "identity_updated": "Identity name updated",
     "delete_identity": "Delete Identity",
-    "delete_confirm": "Are you sure you want to delete this identity? All associated local data will be lost."
+    "delete_confirm": "Are you sure you want to delete this identity? All associated local data will be lost.",
+    "ttl_10min": "10 Minutes",
+    "ttl_30min": "30 Minutes",
+    "ttl_1hour": "1 Hour",
+    "ttl_1day": "1 Day",
+    "ttl_15days": "15 Days",
+    "ttl_30days": "30 Days",
+    "ttl_permanent": "Permanent",
+    "switched_identity": "Switched identity",
+    "identity_deleted": "Identity deleted",
+    "coming_soon": "Coming soon"
   },
   "contacts": {
     "add_contact": "Add Contact",
@@ -67,5 +77,10 @@
     "unsubscribe": "Unsubscribe",
     "no_posts": "No posts found in this channel",
     "search_channels": "Search channels..."
+  },
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try again.",
+    "retry": "Try again"
   }
 }
