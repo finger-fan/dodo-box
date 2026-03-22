@@ -1,5 +1,7 @@
 import type {NextConfig} from 'next';
 
+const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: {
@@ -8,18 +10,20 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Allow access to remote image placeholder.
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**', // This allows any path under the hostname
+  images: isCapacitor
+    ? { unoptimized: true }
+    : {
+        remotePatterns: [
+          {
+            protocol: 'https',
+            hostname: 'picsum.photos',
+            port: '',
+            pathname: '/**',
+          },
+        ],
       },
-    ],
-  },
-  output: 'standalone',
+  output: isCapacitor ? 'export' : 'standalone',
+  ...(isCapacitor && { trailingSlash: true }),
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
