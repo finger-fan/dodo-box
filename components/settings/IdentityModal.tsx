@@ -151,7 +151,7 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
                         <Share2 className="w-5 h-5" />
                       </button>
                     )}
-                    <button className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl backdrop-blur-md transition-colors">
+                    <button disabled title={t('common.coming_soon', 'Coming soon')} className="p-3 bg-white/20 rounded-2xl backdrop-blur-md opacity-40 cursor-not-allowed">
                       <QrCode className="w-5 h-5" />
                     </button>
                   </div>

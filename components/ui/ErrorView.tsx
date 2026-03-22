@@ -23,12 +23,12 @@ export default function ErrorView({
   return (
     <div className={`flex flex-col items-center justify-center gap-4 p-4 ${fullScreen ? 'min-h-screen' : 'flex-1'}`}>
       <h2 className="text-xl font-semibold">{t('error.title', 'Something went wrong')}</h2>
-      <p className="text-muted-foreground text-center text-sm">
+      <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
         {t('error.description', 'An unexpected error occurred. Please try again.')}
       </p>
       <button
         onClick={reset}
-        className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium"
+        className="bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium"
       >
         {t('error.retry', 'Try again')}
       </button>

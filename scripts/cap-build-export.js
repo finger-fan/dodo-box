@@ -17,7 +17,7 @@ run('node scripts/cap-prebuild.js');
 
 let exitCode = 0;
 try {
-  run('npx next build');
+  run('pnpm exec next build');
 } catch (err) {
   exitCode = err.status || 1;
 } finally {

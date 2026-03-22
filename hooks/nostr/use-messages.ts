@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNostr } from '@/contexts/NostrContext'
-import type { NostrMessage, NostrResult } from '@/lib/nostr/types'
+import type { NostrMessage } from '@/lib/nostr/types'
 
 export function useMessages(contactPubkey: string) {
   const { adapter, session } = useNostr()
@@ -69,14 +69,11 @@ export function useMessages(contactPubkey: string) {
   }, [adapter, contactPubkey])
 
   const sendMessage = useCallback(
-    async (text: string): Promise<NostrResult<NostrMessage>> => {
-      if (!text.trim()) return { success: false, error: 'Empty message' }
+    async (text: string): Promise<void> => {
+      if (!text.trim()) return
 
       sendQueueRef.current.push(text)
       await processQueue()
-
-      // The queue has been processed; the optimistic update already reflects the result
-      return { success: true, data: { id: '', text, sender: 'me', timestamp: new Date() } }
     },
     [processQueue]
   )

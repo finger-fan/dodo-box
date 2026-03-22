@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+import { cn, defaultAvatar, shortPubkey } from '@/lib/utils';
 import { useMessages } from '@/hooks/nostr/use-messages';
 import { useNostr } from '@/contexts/NostrContext';
 
@@ -26,15 +26,18 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
   // Load contact profile
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
     adapter.getProfile(id).then((profile) => {
+      if (cancelled) return;
       if (profile) {
-        setChatName(profile.displayName || profile.name || id.slice(0, 8) + '...');
-        setChatAvatar(profile.picture || `https://picsum.photos/seed/${id.slice(0, 8)}/100/100`);
+        setChatName(profile.displayName || profile.name || shortPubkey(id));
+        setChatAvatar(profile.picture || defaultAvatar(id));
       } else {
-        setChatName(id.slice(0, 8) + '...');
-        setChatAvatar(`https://picsum.photos/seed/${id.slice(0, 8)}/100/100`);
+        setChatName(shortPubkey(id));
+        setChatAvatar(defaultAvatar(id));
       }
     });
+    return () => { cancelled = true; };
   }, [id, adapter]);
 
   // Auto-scroll to bottom on new messages

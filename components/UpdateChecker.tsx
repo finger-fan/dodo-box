@@ -6,13 +6,11 @@ import { Download, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 
-export default function UpdateChecker() {
+function UpdateCheckerInner() {
   const { t } = useTranslation();
   const { available, manifest, downloading, error, apply } = useUpdater();
   const [dismissed, setDismissed] = useState(false);
 
-  // Only render on native platforms with an available update
-  if (!Capacitor.isNativePlatform()) return null;
   if (!available || !manifest || dismissed) return null;
 
   return (
@@ -53,4 +51,9 @@ export default function UpdateChecker() {
       </div>
     </div>
   );
+}
+
+export default function UpdateChecker() {
+  if (!Capacitor.isNativePlatform()) return null;
+  return <UpdateCheckerInner />;
 }

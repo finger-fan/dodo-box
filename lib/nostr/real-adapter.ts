@@ -23,7 +23,7 @@ export class RealNostrAdapter implements INostrAdapter {
   private relayUrls: string[]
   private contacts: NostrContact[] = []
   private chats: NostrChat[] = []
-  private contactsFetched = false
+  private contactsFetchPromise: Promise<NostrContact[]> | null = null
 
   constructor(session: NostrSession) {
     this.session = session
@@ -38,8 +38,10 @@ export class RealNostrAdapter implements INostrAdapter {
   }
 
   async getChats(): Promise<NostrChat[]> {
-    if (!this.contactsFetched) {
+    if (!this.contactsFetchPromise) {
       await this.getContacts()
+    } else {
+      await this.contactsFetchPromise
     }
     return [...this.chats]
   }
@@ -162,6 +164,8 @@ export class RealNostrAdapter implements INostrAdapter {
   }
 
   async getContacts(): Promise<NostrContact[]> {
+    if (this.contactsFetchPromise) return this.contactsFetchPromise
+
     if (!this.session.currentPubkey) return []
 
     const filters: NostrFilter[] = [
@@ -174,10 +178,9 @@ export class RealNostrAdapter implements INostrAdapter {
 
     await relayPool.connect(this.relayUrls)
 
-    return new Promise((resolve) => {
+    this.contactsFetchPromise = new Promise((resolve) => {
       const subId = `contacts-${Date.now()}`
       const timeout = setTimeout(() => {
-        this.contactsFetched = true
         relayPool.unsubscribe(subId)
         resolve(this.contacts)
       }, SUBSCRIPTION_TIMEOUT_MS)
@@ -195,13 +198,14 @@ export class RealNostrAdapter implements INostrAdapter {
         }))
 
         this.rebuildChats()
-        this.contactsFetched = true
 
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
         resolve(this.contacts)
       })
     })
+
+    return this.contactsFetchPromise
   }
 
   private rebuildChats(): void {

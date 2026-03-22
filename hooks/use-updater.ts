@@ -28,12 +28,17 @@ export function useUpdater(): UseUpdaterReturn {
   const [manifest, setManifest] = useState<UpdateManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Notify plugin on mount that current bundle is healthy
+  // Notify plugin on mount that current bundle is healthy, then auto-check
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    notifyAppReady().catch((err) => {
-      console.warn('[Updater] notifyAppReady failed:', err);
-    });
+    notifyAppReady()
+      .catch((err) => {
+        console.warn('[Updater] notifyAppReady failed:', err);
+      })
+      .then(() => {
+        if (process.env.NEXT_PUBLIC_UPDATE_URL) check();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const check = useCallback(async () => {
@@ -72,13 +77,6 @@ export function useUpdater(): UseUpdaterReturn {
       setError(err instanceof Error ? err.message : 'Reset failed');
     }
   }, []);
-
-  // Auto-check on mount (native only)
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    if (!process.env.NEXT_PUBLIC_UPDATE_URL) return;
-    check();
-  }, [check]);
 
   return { checking, downloading, available, manifest, error, check, apply, reset };
 }
