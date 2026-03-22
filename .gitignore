@@ -9,3 +9,4 @@ coverage/
 playwright-report/
 test-results/
 tsconfig.tsbuildinfo
+root_claude_settings
