@@ -65,7 +65,11 @@
     "online": "Online",
     "no_messages": "No messages yet",
     "today": "Today",
-    "type_message": "Type a message..."
+    "type_message": "Type a message...",
+    "missing_messages": "{{count}} message(s) may be missing. Tap to recover.",
+    "recovering_messages": "Recovering messages...",
+    "recovery_failed": "Could not recover messages",
+    "send_failed": "Failed to send. Tap to retry."
   },
   "discover": {
     "title": "Discover",

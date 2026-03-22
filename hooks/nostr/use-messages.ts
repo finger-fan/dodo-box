@@ -1,13 +1,24 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNostr } from '@/contexts/NostrContext'
 import type { NostrMessage } from '@/lib/nostr/types'
+import { detectGaps, insertGapIndicators, type ChatItem, type SeqGap } from '@/lib/nostr/gap-detection'
+
+function sortMessages(a: NostrMessage, b: NostrMessage): number {
+  const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
+  if (timeDiff !== 0) return timeDiff
+  if (a.senderPubkey && a.senderPubkey === b.senderPubkey) {
+    return (a.seq ?? 0) - (b.seq ?? 0)
+  }
+  return 0
+}
 
 export function useMessages(contactPubkey: string) {
   const { adapter, session } = useNostr()
   const [messages, setMessages] = useState<NostrMessage[]>([])
   const [isSending, setIsSending] = useState(false)
+  const [recoveringGaps, setRecoveringGaps] = useState<Set<string>>(new Set())
   const sendQueueRef = useRef<string[]>([])
   const isProcessingRef = useRef(false)
 
@@ -32,6 +43,51 @@ export function useMessages(contactPubkey: string) {
     }
   }, [adapter, contactPubkey, session.isAuthenticated])
 
+  const chatItems = useMemo((): ChatItem[] => {
+    const gaps = detectGaps(messages)
+    const items = insertGapIndicators(messages, gaps)
+    // Apply recovering/unrecoverable status
+    return items.map((item) => {
+      if ('type' in item && (item as { type: string }).type === 'gap') {
+        const gapItem = item as ChatItem & { type: 'gap'; id: string }
+        if (recoveringGaps.has(gapItem.id)) {
+          return { ...gapItem, status: 'recovering' as const }
+        }
+      }
+      return item
+    })
+  }, [messages, recoveringGaps])
+
+  const recoverGap = useCallback(async (gap: SeqGap) => {
+    const gapId = `gap-${gap.senderPubkey}-${gap.afterSeq}-${gap.beforeSeq}`
+    setRecoveringGaps(prev => new Set([...prev, gapId]))
+
+    try {
+      const recovered = await adapter.recoverMessages(
+        contactPubkey,
+        Math.floor(gap.afterTimestamp.getTime() / 1000) - 1,
+        Math.floor(gap.beforeTimestamp.getTime() / 1000) + 1
+      )
+
+      if (recovered.length > 0) {
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMsgs = recovered.filter(m => !existingIds.has(m.id))
+          if (newMsgs.length === 0) return prev
+          return [...prev, ...newMsgs].sort(sortMessages)
+        })
+      }
+    } catch (error) {
+      console.error('[useMessages] recoverGap failed:', error)
+    }
+
+    setRecoveringGaps(prev => {
+      const next = new Set(prev)
+      next.delete(gapId)
+      return next
+    })
+  }, [adapter, contactPubkey])
+
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current) return
     isProcessingRef.current = true
@@ -47,6 +103,7 @@ export function useMessages(contactPubkey: string) {
         text,
         sender: 'me',
         timestamp: new Date(),
+        sendStatus: 'pending',
       }
       setMessages((prev) => [...prev, optimistic])
 
@@ -57,10 +114,14 @@ export function useMessages(contactPubkey: string) {
             prev.map((m) => (m.id === optimisticId ? result.data : m))
           )
         } else {
-          setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+          setMessages((prev) =>
+            prev.map((m) => (m.id === optimisticId ? { ...m, sendStatus: 'failed' as const } : m))
+          )
         }
       } catch {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+        setMessages((prev) =>
+          prev.map((m) => (m.id === optimisticId ? { ...m, sendStatus: 'failed' as const } : m))
+        )
       }
     }
 
@@ -78,5 +139,32 @@ export function useMessages(contactPubkey: string) {
     [processQueue]
   )
 
-  return { messages, sendMessage, isSending }
+  const retrySend = useCallback(async (messageId: string) => {
+    const failedMsg = messages.find(m => m.id === messageId && m.sendStatus === 'failed')
+    if (!failedMsg) return
+
+    // Mark as pending
+    setMessages(prev =>
+      prev.map(m => m.id === messageId ? { ...m, sendStatus: 'pending' as const } : m)
+    )
+
+    try {
+      const result = await adapter.sendMessage(contactPubkey, failedMsg.text)
+      if (result.success) {
+        setMessages(prev =>
+          prev.map(m => m.id === messageId ? result.data : m)
+        )
+      } else {
+        setMessages(prev =>
+          prev.map(m => m.id === messageId ? { ...m, sendStatus: 'failed' as const } : m)
+        )
+      }
+    } catch {
+      setMessages(prev =>
+        prev.map(m => m.id === messageId ? { ...m, sendStatus: 'failed' as const } : m)
+      )
+    }
+  }, [adapter, contactPubkey, messages])
+
+  return { messages, chatItems, sendMessage, isSending, recoverGap, retrySend }
 }

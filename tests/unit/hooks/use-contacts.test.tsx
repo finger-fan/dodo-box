@@ -57,6 +57,9 @@ function createTestAdapter(
     async setRelays(): Promise<NostrResult> {
       return { success: true, data: undefined }
     },
+    async recoverMessages(): Promise<NostrMessage[]> {
+      return []
+    },
     ...overrides,
   }
 }

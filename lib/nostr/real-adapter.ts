@@ -14,6 +14,7 @@ import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './events'
 import { relayPool } from './relay-client'
 import { defaultAvatar, shortPubkey } from '@/lib/utils'
+import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-counter'
 
 const MESSAGE_FETCH_LIMIT = 100
 const SUBSCRIPTION_TIMEOUT_MS = 5000
@@ -64,7 +65,16 @@ export class RealNostrAdapter implements INostrAdapter {
       const subId = `msgs-${contactPubkey.slice(0, 8)}-${Date.now()}`
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
-        resolve(messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()))
+        messages.sort((a, b) => {
+          const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
+          if (timeDiff !== 0) return timeDiff
+          if (a.senderPubkey && a.senderPubkey === b.senderPubkey) {
+            return (a.seq ?? 0) - (b.seq ?? 0)
+          }
+          return 0
+        })
+        recoverSeqCounter(this.session.currentPubkey!, contactPubkey, messages)
+        resolve(messages)
       }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
@@ -84,6 +94,7 @@ export class RealNostrAdapter implements INostrAdapter {
           sender: isFromMe ? 'me' : 'them',
           timestamp: new Date(innerEvent.created_at * 1000),
           senderPubkey: innerEvent.pubkey,
+          seq: parseSeqTag(innerEvent.tags),
         })
       })
     })
@@ -98,7 +109,8 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     try {
-      const innerEvent = buildDirectMessageEvent(text, contactPubkey, this.privkey)
+      const seq = incrementSeqCounter(this.session.currentPubkey, contactPubkey)
+      const innerEvent = buildDirectMessageEvent(text, contactPubkey, this.privkey, seq)
 
       // Two gift wraps: one for recipient, one for sender
       const wrapForRecipient = createGiftWrap(innerEvent, contactPubkey)
@@ -106,7 +118,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
       // relayPool.connect is idempotent but skipped here since connections
       // are established during getContacts/getMessages which run before send
-      await relayPool.publish(wrapForRecipient)
+      const recipientOk = await relayPool.publish(wrapForRecipient)
       await relayPool.publish(wrapForSelf)
 
       const msg: NostrMessage = {
@@ -114,6 +126,8 @@ export class RealNostrAdapter implements INostrAdapter {
         text,
         sender: 'me',
         timestamp: new Date(innerEvent.created_at * 1000),
+        seq,
+        sendStatus: recipientOk ? 'sent' : 'failed',
       }
 
       // Update last message
@@ -156,6 +170,7 @@ export class RealNostrAdapter implements INostrAdapter {
           sender: 'them',
           timestamp: new Date(innerEvent.created_at * 1000),
           senderPubkey: innerEvent.pubkey,
+          seq: parseSeqTag(innerEvent.tags),
         })
       })
     })
@@ -357,6 +372,56 @@ export class RealNostrAdapter implements INostrAdapter {
 
   getRelays(): string[] {
     return [...this.relayUrls]
+  }
+
+  async recoverMessages(
+    contactPubkey: string,
+    since: number,
+    until: number
+  ): Promise<NostrMessage[]> {
+    if (!this.session.currentPubkey || !this.privkey) return []
+
+    const RECOVERY_TIMEOUT_MS = 8000
+    const messages: NostrMessage[] = []
+    const filters: NostrFilter[] = [
+      {
+        kinds: [KIND_DM_WRAP],
+        '#p': [this.session.currentPubkey],
+        since,
+        until,
+      },
+    ]
+
+    await relayPool.connect(this.relayUrls)
+
+    return new Promise((resolve) => {
+      const subId = `recover-${contactPubkey.slice(0, 8)}-${Date.now()}`
+      const timeout = setTimeout(() => {
+        relayPool.unsubscribe(subId)
+        resolve(messages)
+      }, RECOVERY_TIMEOUT_MS)
+
+      relayPool.subscribe(subId, filters, (event) => {
+        const innerEvent = decryptGiftWrap(event, this.privkey)
+        if (!innerEvent) return
+
+        const isFromContact = innerEvent.pubkey === contactPubkey
+        const isFromMe =
+          innerEvent.pubkey === this.session.currentPubkey &&
+          innerEvent.tags.some(t => t[0] === 'p' && t[1] === contactPubkey)
+
+        if (!isFromContact && !isFromMe) return
+
+        messages.push({
+          id: innerEvent.id,
+          text: innerEvent.content,
+          sender: isFromMe ? 'me' : 'them',
+          timestamp: new Date(innerEvent.created_at * 1000),
+          senderPubkey: innerEvent.pubkey,
+          seq: parseSeqTag(innerEvent.tags),
+        })
+      })
+    })
   }
 
   async setRelays(relays: string[]): Promise<NostrResult> {
