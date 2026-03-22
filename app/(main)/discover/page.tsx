@@ -51,10 +51,7 @@ export default function DiscoverPage() {
   if (!mounted) return null;
 
   const subscribedChannels = channels.filter(c => c.isSubscribed);
-  const posts: Post[] = [];
-  const filteredPosts = activeChannelId === 'all'
-    ? posts.filter(p => channels.find(c => c.id === p.channelId)?.isSubscribed)
-    : posts.filter(p => p.channelId === activeChannelId);
+  const filteredPosts: Post[] = [];
 
   const toggleSubscription = (id: string) => {
     setChannels(prev => prev.map(c => 

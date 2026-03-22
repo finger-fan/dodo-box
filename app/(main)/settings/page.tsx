@@ -66,11 +66,6 @@ export default function SettingsPage() {
 
   const handleLanguageChange = (lang: string) => {
     i18n.changeLanguage(lang);
-    try {
-      localStorage.setItem('dodobox_language', lang);
-    } catch (err) {
-      console.warn('[Settings] Failed to save language to localStorage:', err);
-    }
   };
 
   const handleToast = (message: string, type: 'success' | 'error') => {

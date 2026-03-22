@@ -112,6 +112,13 @@ export function decodeIdentityInfo(protocolStr: string): { pubkey: string; nickn
 }
 
 /**
+ * Generate a default avatar URL from a pubkey
+ */
+export function defaultAvatar(pubkey: string): string {
+  return `https://picsum.photos/seed/${pubkey.slice(0, 8)}/100/100`
+}
+
+/**
  * Format a pubkey hex as short display string
  */
 export function shortPubkey(pubkeyHex: string): string {

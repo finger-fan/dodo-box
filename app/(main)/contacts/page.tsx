@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
 import { useContacts } from '@/hooks/nostr/use-contacts';
 import { useMounted } from '@/hooks/use-mounted';
+import { defaultAvatar } from '@/lib/utils';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -124,7 +125,7 @@ export default function ContactsPage() {
               >
                 <div className="w-12 h-12 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-800 relative">
                   <Image
-                    src={contact.avatar || `https://picsum.photos/seed/${contact.pubkey.slice(0, 8)}/100/100`}
+                    src={contact.avatar || defaultAvatar(contact.pubkey)}
                     alt={contact.name}
                     fill
                     className="object-cover"

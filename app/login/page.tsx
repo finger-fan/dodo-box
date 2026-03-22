@@ -63,11 +63,6 @@ export default function LoginPage() {
             onClick={() => {
               const next = i18n.language === 'en' ? 'zh' : 'en';
               i18n.changeLanguage(next);
-              try {
-                localStorage.setItem('dodobox_language', next);
-              } catch (err) {
-                console.warn('[Login] Failed to save language to localStorage:', err);
-              }
             }}
             className="p-2 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shadow-sm"
             aria-label="Toggle language"

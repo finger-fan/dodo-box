@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { NostrEvent, NostrFilter } from '@/lib/nostr/types'
+import { shortPubkey } from '@/lib/utils'
 
 const { mockRelayPool } = vi.hoisted(() => {
   const mockRelayPool = {
@@ -143,7 +144,7 @@ describe('RealNostrAdapter.getContacts', () => {
     const contacts = await adapter.getContacts()
 
     expect(contacts).toHaveLength(1)
-    expect(contacts[0].name).toBe(CONTACT_PUBKEY.slice(0, 8) + '...')
+    expect(contacts[0].name).toBe(shortPubkey(CONTACT_PUBKEY))
   })
 })
 
@@ -159,7 +160,7 @@ describe('RealNostrAdapter.addContact', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.pubkey).toBe(CONTACT_PUBKEY)
-      expect(result.data.name).toBe(CONTACT_PUBKEY.slice(0, 8) + '...')
+      expect(result.data.name).toBe(shortPubkey(CONTACT_PUBKEY))
     }
     expect(mockRelayPool.publish).toHaveBeenCalledTimes(1)
   })

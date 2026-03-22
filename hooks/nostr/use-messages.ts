@@ -72,9 +72,10 @@ export function useMessages(contactPubkey: string) {
     async (text: string): Promise<NostrResult<NostrMessage>> => {
       if (!text.trim()) return { success: false, error: 'Empty message' }
 
-      sendQueueRef.current = [...sendQueueRef.current, text]
+      sendQueueRef.current.push(text)
       await processQueue()
 
+      // The queue has been processed; the optimistic update already reflects the result
       return { success: true, data: { id: '', text, sender: 'me', timestamp: new Date() } }
     },
     [processQueue]
