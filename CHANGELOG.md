@@ -4,6 +4,45 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.6 — 2026-03-22
+
+### Bug Fixes
+- **登录竞态条件修复**：解决登录流程中的 race condition 问题
+- **语言持久化**：修复语言偏好未正确持久化的问题
+- **联系人缓存**：修复联系人数据缓存失效问题
+- **快速发送 bug**：修复消息快速发送时的并发问题
+
+### Features
+- **`/changes` 命令**：新增查看当前代码变更的 CLI 命令
+- **CLAUDE.md 中文翻译**：项目指引文件翻译为中文
+- **IdentityModal 组件**：从 settings 页面提取独立的身份管理模态框
+
+### Improvements
+- **错误边界去重**：统一 `app/error.tsx` 和 `app/(main)/error.tsx`，抽取 `ErrorView` 公共组件
+- **移除 IndexedDB 存储**：删除 `lib/nostr/storage.ts`，简化数据存储层
+- **提取 `useMounted` hook**：从多个组件中抽取通用挂载状态 hook
+- **Docker 和设置优化**：改进 Dockerfile 和 docker-compose.yml 配置
+- **适配器辅助函数整理**：清理 real-adapter 中的重复代码
+- **CLAUDE.md 操作规则补充**：新增调试、构建、Docker 等操作规范
+
+### Tests
+- **use-chats.test.tsx** (新增)：聊天 hook 单元测试
+- **use-contacts.test.tsx** (新增)：联系人 hook 单元测试
+- **real-adapter-contacts.test.ts** (新增)：联系人适配器单元测试
+- **real-adapter-profile.test.ts** (新增)：个人资料适配器单元测试
+- **vault-sync.test.ts** (新增)：Vault 同步模块单元测试
+
+### Changed Files
+- `app/(main)/settings/page.tsx` — 大幅重构，提取 IdentityModal
+- `components/settings/IdentityModal.tsx` — 新建独立身份管理组件
+- `components/ui/ErrorView.tsx` — 新建公共错误视图组件
+- `contexts/NostrContext.tsx` — 改进会话管理和错误处理
+- `lib/nostr/storage.ts` — 已删除（移除 IndexedDB）
+- `hooks/use-mounted.ts` — 新建通用挂载状态 hook
+- `docker-compose.yml` — 配置优化
+
+---
+
 ## v0.8.5 — 2026-03-20
 
 ### Bug Fixes
