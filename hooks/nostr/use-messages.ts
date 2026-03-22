@@ -73,7 +73,7 @@ export function useMessages(contactPubkey: string) {
       if (!text.trim()) return { success: false, error: 'Empty message' }
 
       sendQueueRef.current = [...sendQueueRef.current, text]
-      processQueue()
+      await processQueue()
 
       return { success: true, data: { id: '', text, sender: 'me', timestamp: new Date() } }
     },

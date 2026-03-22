@@ -129,7 +129,7 @@ describe('login', () => {
     })
 
     expect(result!.success).toBe(false)
-    expect(result!.error).toBeTruthy()
+    expect(!result!.success && result!.error).toBeTruthy()
   })
 
   it('persists session to localStorage on success', async () => {
@@ -173,7 +173,7 @@ describe('register', () => {
     })
 
     expect(result!.success).toBe(false)
-    expect(result!.error).toContain('already exists')
+    expect(!result!.success && result!.error).toContain('already exists')
   })
 })
 

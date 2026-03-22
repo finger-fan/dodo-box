@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useRef, useCallback } from 'react';
+import { useMounted } from '@/hooks/use-mounted';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
@@ -16,15 +17,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const { adapter } = useNostr();
   const { messages, sendMessage, isSending } = useMessages(id);
   const [msgInput, setMsgInput] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [chatName, setChatName] = useState('');
   const [chatAvatar, setChatAvatar] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
 
   // Load contact profile
   useEffect(() => {

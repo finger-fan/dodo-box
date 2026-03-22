@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Camera, X, Users } from 'lucide-react';
@@ -10,6 +10,7 @@ import SwipeableListItem from '@/components/ui/SwipeableListItem';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
 import { useContacts } from '@/hooks/nostr/use-contacts';
+import { useMounted } from '@/hooks/use-mounted';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -19,14 +20,9 @@ export default function ContactsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [contactInput, setContactInput] = useState('');
   const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [editingName, setEditingName] = useState('');
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
 
   const filteredContacts = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase())

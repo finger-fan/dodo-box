@@ -2,6 +2,10 @@
 
 import type { NostrFilter, NostrEvent } from './types'
 
+const INITIAL_RECONNECT_DELAY_MS = 1000
+const MAX_RECONNECT_DELAY_MS = 30000
+const PUBLISH_TIMEOUT_MS = 3000
+
 type SubCallback = (event: NostrEvent) => void
 type EoseCallback = () => void
 
@@ -9,8 +13,8 @@ export class RelayClient {
   private ws: WebSocket | null = null
   private subscriptions = new Map<string, SubCallback>()
   private eoseCallbacks = new Map<string, EoseCallback>()
-  private reconnectDelay = 1000
-  private maxReconnectDelay = 30000
+  private reconnectDelay = INITIAL_RECONNECT_DELAY_MS
+  private maxReconnectDelay = MAX_RECONNECT_DELAY_MS
   private shouldReconnect = true
   private connected = false
   private pendingPublishes = new Map<string, (accepted: boolean) => void>()
@@ -24,7 +28,7 @@ export class RelayClient {
 
         this.ws.onopen = () => {
           this.connected = true
-          this.reconnectDelay = 1000
+          this.reconnectDelay = INITIAL_RECONNECT_DELAY_MS
           resolve()
         }
 
@@ -63,8 +67,8 @@ export class RelayClient {
                 this.pendingPublishes.delete(eventId)
               }
             }
-          } catch {
-            // ignore parse errors
+          } catch (err) {
+            console.warn('[RelayClient] Failed to parse message:', err)
           }
         }
       } catch (err) {
@@ -81,7 +85,7 @@ export class RelayClient {
       const timeout = setTimeout(() => {
         this.pendingPublishes.delete(event.id)
         resolve(false)
-      }, 3000)
+      }, PUBLISH_TIMEOUT_MS)
 
       this.pendingPublishes.set(event.id, (accepted) => {
         clearTimeout(timeout)
@@ -117,6 +121,7 @@ export class RelayClient {
 
 export class RelayPool {
   private clients = new Map<string, RelayClient>()
+  private failedRelays = new Set<string>()
 
   async connect(relayUrls: string[]): Promise<void> {
     const connectPromises = relayUrls.map(async (url) => {
@@ -125,12 +130,18 @@ export class RelayPool {
         this.clients.set(url, client)
         try {
           await client.connect()
+          this.failedRelays.delete(url)
         } catch (err) {
+          this.failedRelays.add(url)
           console.warn(`[RelayPool] Failed to connect to ${url}:`, err)
         }
       }
     })
     await Promise.allSettled(connectPromises)
+  }
+
+  getFailedRelays(): string[] {
+    return Array.from(this.failedRelays)
   }
 
   async publish(event: NostrEvent): Promise<boolean> {

@@ -1,10 +1,12 @@
 // vault-sync.ts - Vault sync with Nostr relays
 
-import { VAULT_EVENT_KIND, VAULT_EVENT_D_TAG } from './types'
+import { KIND_VAULT, VAULT_EVENT_D_TAG } from './types'
 import type { VaultData, NostrFilter } from './types'
 import { encryptVault, decryptVault, createEmptyVaultData } from './vault-crypto'
 import { buildVaultEvent } from './events'
 import { relayPool } from './relay-client'
+
+const VAULT_SUBSCRIPTION_TIMEOUT_MS = 10000
 
 export class VaultSync {
   private relayUrls: string[]
@@ -26,7 +28,7 @@ export class VaultSync {
       const subId = `vault-check-${Date.now()}`
       const filters: NostrFilter[] = [
         {
-          kinds: [VAULT_EVENT_KIND],
+          kinds: [KIND_VAULT],
           authors: [masterPublicKey],
           '#d': [VAULT_EVENT_D_TAG],
           limit: 1,
@@ -37,7 +39,7 @@ export class VaultSync {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(found)
-      }, 10000)
+      }, VAULT_SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, () => {
         found = true
@@ -69,7 +71,7 @@ export class VaultSync {
       const subId = `vault-fetch-${Date.now()}`
       const filters: NostrFilter[] = [
         {
-          kinds: [VAULT_EVENT_KIND],
+          kinds: [KIND_VAULT],
           authors: [masterPublicKey],
           '#d': [VAULT_EVENT_D_TAG],
           limit: 1,
@@ -95,7 +97,7 @@ export class VaultSync {
         }
       }
 
-      const timeout = setTimeout(resolveWithLatest, 10000)
+      const timeout = setTimeout(resolveWithLatest, VAULT_SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         if (!latestEvent || event.created_at > latestEvent.created_at) {
@@ -113,7 +115,10 @@ export class VaultSync {
     const encryptedContent = await encryptVault(masterPrivateKey, vaultData)
     const event = buildVaultEvent(encryptedContent, masterPrivateKey)
     await relayPool.connect(this.relayUrls)
-    relayPool.publish(event)
+    const accepted = await relayPool.publish(event)
+    if (!accepted) {
+      throw new Error('Vault publish failed: no relay accepted the event')
+    }
   }
 
   async createVault(masterPrivateKey: string): Promise<VaultData> {

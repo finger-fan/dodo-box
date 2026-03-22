@@ -13,7 +13,9 @@ import type {
 import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './events'
 import { relayPool } from './relay-client'
-import { nostrStorage } from './storage'
+
+const MESSAGE_FETCH_LIMIT = 100
+const SUBSCRIPTION_TIMEOUT_MS = 5000
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -46,7 +48,7 @@ export class RealNostrAdapter implements INostrAdapter {
       {
         kinds: [KIND_DM_WRAP],
         '#p': [this.session.currentPubkey],
-        limit: 100,
+        limit: MESSAGE_FETCH_LIMIT,
       },
     ]
 
@@ -57,7 +59,7 @@ export class RealNostrAdapter implements INostrAdapter {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()))
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         const innerEvent = decryptGiftWrap(event, this.privkey)
@@ -110,7 +112,7 @@ export class RealNostrAdapter implements INostrAdapter {
       // Update last message
       this.chats = this.chats.map(c =>
         c.pubkey === contactPubkey
-          ? { ...c, lastMsg: text, time: 'Just now', unread: 0 }
+          ? { ...c, lastMsg: text, time: new Date().toISOString(), unread: 0 }
           : c
       )
 
@@ -157,10 +159,6 @@ export class RealNostrAdapter implements INostrAdapter {
   async getContacts(): Promise<NostrContact[]> {
     if (!this.session.currentPubkey) return []
 
-    // Load cached contacts for name fallback
-    const cached = await nostrStorage.getContacts()
-    const cachedNameMap = new Map(cached.map(c => [c.pubkey, c.name]))
-
     const filters: NostrFilter[] = [
       {
         kinds: [KIND_FOLLOWS],
@@ -175,13 +173,8 @@ export class RealNostrAdapter implements INostrAdapter {
       const subId = `contacts-${Date.now()}`
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
-        // On timeout, return cached contacts if we have them
-        if (this.contacts.length === 0 && cached.length > 0) {
-          this.contacts = cached
-          this.rebuildChats()
-        }
         resolve(this.contacts)
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         const contactTags = event.tags
@@ -190,15 +183,12 @@ export class RealNostrAdapter implements INostrAdapter {
 
         this.contacts = contactTags.map((ct, i) => ({
           id: `contact-${i}`,
-          name: ct.petname || cachedNameMap.get(ct.pubkey) || ct.pubkey.slice(0, 8) + '...',
+          name: ct.petname || ct.pubkey.slice(0, 8) + '...',
           pubkey: ct.pubkey,
           avatar: `https://picsum.photos/seed/${ct.pubkey.slice(0, 8)}/100/100`,
         }))
 
         this.rebuildChats()
-
-        // Persist to cache
-        nostrStorage.saveContacts(this.contacts).catch(() => {})
 
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
@@ -262,7 +252,6 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     this.contacts = [...this.contacts, newContact]
-    nostrStorage.saveContacts(this.contacts).catch(() => {})
 
     // Publish new kind 3 follows list with petnames
     if (this.privkey) {
@@ -281,7 +270,6 @@ export class RealNostrAdapter implements INostrAdapter {
     const before = this.contacts.length
     this.contacts = this.contacts.filter(c => c.pubkey !== pubkey)
     this.chats = this.chats.filter(c => c.pubkey !== pubkey)
-    nostrStorage.saveContacts(this.contacts).catch(() => {})
 
     if (this.contacts.length === before) {
       return { success: false, error: 'Contact not found' }
@@ -311,7 +299,7 @@ export class RealNostrAdapter implements INostrAdapter {
       const timeout = setTimeout(() => {
         relayPool.unsubscribe(subId)
         resolve(null)
-      }, 5000)
+      }, SUBSCRIPTION_TIMEOUT_MS)
 
       relayPool.subscribe(subId, filters, (event) => {
         clearTimeout(timeout)

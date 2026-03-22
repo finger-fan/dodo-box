@@ -1,5 +1,5 @@
 # Stage 1: Install dependencies (layer cached when package.json + lockfile unchanged)
-FROM node:22-alpine AS deps
+FROM node:22-alpine3.21 AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml ./
@@ -9,12 +9,10 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
-ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
 RUN pnpm run build
 
 # Stage 3: Minimal production runner
-FROM node:22-alpine AS runner
+FROM node:22-alpine3.21 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -30,5 +28,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=30s \
+  CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["node", "server.js"]

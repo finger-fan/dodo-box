@@ -12,7 +12,7 @@ export default defineConfig({
       ['tests/integration/**', 'jsdom'],
     ],
     setupFiles: ['./vitest.setup.ts'],
-    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.tsx'],
+    include: ['tests/unit/**/*.test.{ts,tsx}', 'tests/integration/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

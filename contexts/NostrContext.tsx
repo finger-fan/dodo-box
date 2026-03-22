@@ -83,6 +83,8 @@ export function NostrProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<NostrSession>(() => {
     const persisted = loadPersistedSession()
     if (persisted.isAuthenticated && persisted.currentPubkey) {
+      // Note: On page refresh, private keys will be lost (memory-only refs).
+      // The useEffect below handles auto-logout for this case.
       return {
         isAuthenticated: persisted.isAuthenticated,
         username: persisted.username,
@@ -99,8 +101,10 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
   // Auto-logout on page refresh when privkey is lost (session persisted but key in memory is gone)
   useEffect(() => {
-    if (session.isAuthenticated && !identityPrivkeyRef.current && !masterPrivkeyRef.current) {
-      // Session was restored from localStorage but private keys are lost
+    if (!session.isAuthenticated) return
+    if (identityPrivkeyRef.current || masterPrivkeyRef.current) return
+    // Session was restored from localStorage but private keys are lost — defer state updates
+    queueMicrotask(() => {
       masterPrivkeyRef.current = null
       identityPrivkeyRef.current = null
       setSession(EMPTY_SESSION)
@@ -110,21 +114,25 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('dodobox_current_user')
       }
       setAdapter(createNostrAdapter())
-    }
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function persistSession(s: NostrSession & { masterPubkey?: string }) {
     if (typeof window === 'undefined') return
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({
-        isAuthenticated: s.isAuthenticated,
-        username: s.username,
-        currentPubkey: s.currentPubkey,
-        masterPubkey: s.masterPubkey,
-        vaultData: null,
-      })
-    )
+    try {
+      localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          isAuthenticated: s.isAuthenticated,
+          username: s.username,
+          currentPubkey: s.currentPubkey,
+          masterPubkey: s.masterPubkey,
+          vaultData: null,
+        })
+      )
+    } catch (err) {
+      console.warn('[NostrContext] Failed to persist session to localStorage:', err)
+    }
   }
 
   function buildAdapterForSession(
