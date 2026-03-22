@@ -1,18 +1,19 @@
 ---
-description: Deploy the app — switch to release branch, bump patch version, update CHANGELOG, tag the release, push to remote, build Docker image, and restart containers.
+description: Deploy the app — switch to release branch, bump patch version, build Docker image, then commit/push/tag and restart containers.
 ---
 
 # Deploy Command
 
 Full deployment pipeline for dodo-box:
 1. Switch to `release` branch and pull latest
-2. Bump `patch` version in `package.json`
+2. Read current version, calculate next patch version
 3. Summarize changes since last tag and write to `CHANGELOG.md`
-4. Commit version bump + changelog
-5. Create annotated git tag `v<next>`
-6. Push `release` branch and tag to remote
-7. Build Docker image (`docker compose build app`)
-8. Restart container (`docker compose up -d app`)
+4. Bump patch version in `package.json`
+5. Build Docker image (before any git commit)
+6. If build succeeds: commit, tag, push
+7. Restart container
+8. Verify deployment
+9. Merge release back into dev
 
 ---
 
@@ -29,11 +30,22 @@ Announce: "On branch: release | ready to deploy"
 
 ## Step 2 — Read current version
 
+Read the version from `package.json` using shell tools (NOT `node -e`, which requires approval and blocks the flow):
+
 ```bash
-node -e "console.log(require('./package.json').version)"
+grep '"version"' package.json | awk -F'"' '{print $4}'
 ```
 
-Calculate next patch version (e.g. `0.8.0` → `0.8.1`).
+Calculate next patch version (e.g. `0.8.0` → `0.8.1`). Use shell arithmetic:
+
+```bash
+CURRENT=$(grep '"version"' package.json | awk -F'"' '{print $4}')
+MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+MINOR=$(echo "$CURRENT" | cut -d. -f2)
+PATCH=$(echo "$CURRENT" | cut -d. -f3)
+NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
+echo "$CURRENT → $NEXT"
+```
 
 Announce: "Deploying: v<current> → v<next>"
 
@@ -98,19 +110,38 @@ Pattern to update:
 "version": "<next>",
 ```
 
-Verify:
+Verify with shell:
 ```bash
-node -e "console.log(require('./package.json').version)"
+grep '"version"' package.json | awk -F'"' '{print $4}'
 ```
 
-## Step 5 — Commit version bump + changelog
+## Step 5 — Build Docker image
+
+Build the Docker image BEFORE committing. This ensures we only commit and push after a successful build.
+
+This step is long-running so MUST use `run_in_background: true` on the Bash tool to avoid blocking, then use `TaskOutput` with `block: true` and `timeout: 600000` to wait for completion.
+
+```bash
+APP_VERSION=<next> docker compose build app
+```
+
+- CRITICAL: Use `run_in_background: true` for this Bash call — the build often takes 5-10 minutes and will otherwise time out
+- After the build completes, read the output to check for errors
+- If the build fails:
+  1. Revert the version bump and changelog changes: `git checkout -- package.json CHANGELOG.md`
+  2. Print the error
+  3. STOP — do NOT commit, tag, push, or restart
+
+## Step 6 — Commit, tag, and push (only after successful build)
+
+Only execute this step if the Docker build in Step 5 succeeded.
 
 ```bash
 git add package.json CHANGELOG.md
 git commit -m "chore: release v<next>"
 ```
 
-## Step 6 — Create annotated git tag
+Create annotated git tag:
 
 ```bash
 git tag -a v<next> -m "release v<next>"
@@ -121,7 +152,7 @@ Verify:
 git tag --sort=-version:refname | head -3
 ```
 
-## Step 7 — Push release branch and tag to remote
+Push release branch and tag to remote:
 
 ```bash
 git push origin release
@@ -130,19 +161,7 @@ git push origin v<next>
 
 If push fails due to diverged history, stop and report — do NOT force-push.
 
-## Step 8 — Build Docker image
-
-Build the Docker image with the version tag. This step is long-running so MUST use `run_in_background: true` on the Bash tool to avoid blocking, then use `TaskOutput` with `block: true` and `timeout: 600000` to wait for completion.
-
-```bash
-APP_VERSION=<next> docker compose build app
-```
-
-- CRITICAL: Use `run_in_background: true` for this Bash call — the build often takes 5-10 minutes and will otherwise time out
-- After the build completes, read the output to check for errors
-- If the build fails, print the error and stop — do NOT proceed to step 9
-
-## Step 9 — Restart container
+## Step 7 — Restart container
 
 Pass `APP_VERSION` so the container runs the correctly tagged image:
 
@@ -152,7 +171,7 @@ APP_VERSION=<next> docker compose up -d app
 
 This recreates only the `app` service without touching the `relay` service.
 
-## Step 10 — Verify deployment
+## Step 8 — Verify deployment
 
 ```bash
 APP_VERSION=<next> docker compose ps
@@ -170,7 +189,7 @@ Optionally tail the last 20 lines of logs to catch startup errors:
 docker compose logs --tail=20 app
 ```
 
-## Step 11 — Merge release back into dev
+## Step 9 — Merge release back into dev
 
 Switch to dev and merge release so that dev gets the version bump, changelog, and any release-only fixes:
 
@@ -186,7 +205,7 @@ If there are merge conflicts:
 - Ask the user to resolve manually
 - Do NOT force-push or discard changes
 
-## Step 12 — Report
+## Step 10 — Report
 
 Print a summary:
 - Version bumped: vX.X.X → vX.X.X
@@ -205,10 +224,12 @@ Print a summary:
 - NEVER force-push to `release`
 - NEVER touch the `relay` service unless explicitly asked
 - NEVER bump minor or major versions — only patch
+- NEVER commit or push if `docker compose build` fails — revert local changes instead
 - If `docker compose build` fails, stop and report the error without running `up`
 - Return to `dev` branch after deployment completes
-- NEVER skip merging release back to dev (Step 11) — this is the most commonly forgotten step
+- NEVER skip merging release back to dev (Step 9) — this is the most commonly forgotten step
 - NEVER use `--mount=type=cache` in Dockerfile — it breaks layer caching
 - NEVER kill processes directly — use `systemctl` for service management
 - If deployment fails, check `docker compose logs` FIRST before proposing fixes
 - Use `pnpm` (not `npm`) for all package operations including Docker builds
+- NEVER use `node -e` to read package.json — use `grep`/`awk`/`cut` shell commands instead
