@@ -17,6 +17,9 @@ importers:
       '@capacitor/status-bar':
         specifier: ^7.0.5
         version: 7.0.5(@capacitor/core@8.2.0)
+      '@capgo/capacitor-updater':
+        specifier: ^8.43.11
+        version: 8.43.11(@capacitor/core@8.2.0)
       '@google/genai':
         specifier: ^1.17.0
         version: 1.45.0(@modelcontextprotocol/sdk@1.27.1(zod@3.25.76))
@@ -286,6 +289,11 @@ packages:
     resolution: {integrity: sha512-d0DI/Usy4RrNiV5xfnypXNRLmWYMixC2yAUAwe6sCQQ0HF7oskDf4RpCxcZqbxnpc4H4A0qqiOSltfJLFAYshg==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capgo/capacitor-updater@8.43.11':
+    resolution: {integrity: sha512-4C2D62Aswaee8O7qoDH4XcT6aE6asbIMfYKnzN9RLwNIYFAkJJcsXdbJt0D6FGdJQ59n4Jqyer4ZKWEiy9KPWg==}
+    peerDependencies:
+      '@capacitor/core': ^8.0.0
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -6032,6 +6040,10 @@ snapshots:
       tslib: 2.8.1
 
   '@capacitor/status-bar@7.0.5(@capacitor/core@8.2.0)':
+    dependencies:
+      '@capacitor/core': 8.2.0
+
+  '@capgo/capacitor-updater@8.43.11(@capacitor/core@8.2.0)':
     dependencies:
       '@capacitor/core': 8.2.0
 

@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import packageJson from './package.json' with { type: 'json' };
 
 const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 
@@ -24,6 +25,9 @@ const nextConfig: NextConfig = {
       },
   output: isCapacitor ? 'export' : 'standalone',
   ...(isCapacitor && { trailingSlash: true }),
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+  },
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.

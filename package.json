@@ -32,12 +32,15 @@
     "cap:build": "pnpm cap:export && pnpm cap:sync",
     "cap:apk:debug": "pnpm cap:build && cd android && ./gradlew assembleDebug",
     "cap:apk:release": "pnpm cap:build && cd android && ./gradlew assembleRelease",
+    "cap:bundle": "node scripts/cap-bundle.js",
+    "cap:upload": "bash scripts/cap-upload.sh",
     "cap:open": "npx cap open android"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^8.2.0",
     "@capacitor/status-bar": "^7.0.5",
+    "@capgo/capacitor-updater": "^8.43.11",
     "@google/genai": "^1.17.0",
     "@hookform/resolvers": "^5.2.1",
     "@noble/curves": "^1.9.7",

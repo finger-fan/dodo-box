@@ -78,6 +78,16 @@
     "no_posts": "No posts found in this channel",
     "search_channels": "Search channels..."
   },
+  "updater": {
+    "section_title": "App Update",
+    "current_version": "Current Version",
+    "check_update": "Check Update",
+    "checking": "Checking...",
+    "reset_builtin": "Reset to Factory",
+    "new_version": "v{{version}} available",
+    "downloading": "Downloading...",
+    "update": "Update"
+  },
   "error": {
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Please try again.",
