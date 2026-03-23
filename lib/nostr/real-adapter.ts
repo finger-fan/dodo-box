@@ -18,6 +18,29 @@ import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-count
 
 const MESSAGE_FETCH_LIMIT = 100
 const SUBSCRIPTION_TIMEOUT_MS = 5000
+const CONTACTS_CACHE_KEY = 'dodobox_contacts_cache'
+
+function loadCachedContacts(pubkey: string): NostrContact[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(`${CONTACTS_CACHE_KEY}_${pubkey}`)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as NostrContact[]
+  } catch {
+    return []
+  }
+}
+
+function saveCachedContacts(pubkey: string, contacts: readonly NostrContact[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(`${CONTACTS_CACHE_KEY}_${pubkey}`, JSON.stringify(contacts))
+  } catch {
+    // localStorage full or unavailable — non-critical
+  }
+}
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -31,6 +54,14 @@ export class RealNostrAdapter implements INostrAdapter {
     this.relayUrls = (
       process.env.NEXT_PUBLIC_DEFAULT_RELAYS || 'wss://relay.damus.io'
     ).split(',')
+
+    // Restore cached contacts so names display immediately before relay responds
+    if (session.currentPubkey) {
+      this.contacts = loadCachedContacts(session.currentPubkey)
+      if (this.contacts.length > 0) {
+        this.rebuildChats()
+      }
+    }
   }
 
   private get privkey(): string {
@@ -213,6 +244,9 @@ export class RealNostrAdapter implements INostrAdapter {
         }))
 
         this.rebuildChats()
+        if (this.session.currentPubkey) {
+          saveCachedContacts(this.session.currentPubkey, this.contacts)
+        }
 
         clearTimeout(timeout)
         relayPool.unsubscribe(subId)
@@ -278,6 +312,9 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     this.contacts = [...this.contacts, newContact]
+    if (this.session.currentPubkey) {
+      saveCachedContacts(this.session.currentPubkey, this.contacts)
+    }
 
     // Publish new kind 3 follows list with petnames
     if (this.privkey) {
@@ -296,6 +333,9 @@ export class RealNostrAdapter implements INostrAdapter {
     const before = this.contacts.length
     this.contacts = this.contacts.filter(c => c.pubkey !== pubkey)
     this.chats = this.chats.filter(c => c.pubkey !== pubkey)
+    if (this.session.currentPubkey) {
+      saveCachedContacts(this.session.currentPubkey, this.contacts)
+    }
 
     if (this.contacts.length === before) {
       return { success: false, error: 'Contact not found' }
