@@ -5,6 +5,8 @@ import {
   saveCachedContacts,
   loadCachedChats,
   saveCachedChats,
+  isContactCacheEnabled,
+  setContactCacheEnabled,
 } from '@/lib/nostr/contact-cache'
 import type { NostrContact, NostrChat } from '@/lib/nostr/types'
 
@@ -24,71 +26,111 @@ describe('contact-cache', () => {
     localStorage.clear()
   })
 
-  describe('loadCachedContacts', () => {
-    it('returns empty array when no cache exists', () => {
-      expect(loadCachedContacts(PUBKEY)).toEqual([])
+  describe('toggle', () => {
+    it('is disabled by default', () => {
+      expect(isContactCacheEnabled()).toBe(false)
     })
 
-    it('returns cached contacts', () => {
+    it('can be enabled and disabled', () => {
+      setContactCacheEnabled(true)
+      expect(isContactCacheEnabled()).toBe(true)
+      setContactCacheEnabled(false)
+      expect(isContactCacheEnabled()).toBe(false)
+    })
+
+    it('clears cached data when disabled', () => {
+      setContactCacheEnabled(true)
       saveCachedContacts(PUBKEY, sampleContacts)
-      expect(loadCachedContacts(PUBKEY)).toEqual(sampleContacts)
-    })
-
-    it('returns empty array for invalid JSON', () => {
-      localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, 'not-json')
-      expect(loadCachedContacts(PUBKEY)).toEqual([])
-    })
-
-    it('returns empty array for non-array JSON', () => {
-      localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, '{"key":"value"}')
-      expect(loadCachedContacts(PUBKEY)).toEqual([])
-    })
-
-    it('isolates cache by pubkey', () => {
-      const otherPubkey = 'd'.repeat(64)
-      saveCachedContacts(PUBKEY, sampleContacts)
-      expect(loadCachedContacts(otherPubkey)).toEqual([])
+      expect(localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)).not.toBeNull()
+      setContactCacheEnabled(false)
+      expect(localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)).toBeNull()
     })
   })
 
-  describe('saveCachedContacts', () => {
-    it('persists contacts to localStorage', () => {
+  describe('when cache disabled', () => {
+    it('save is a no-op', () => {
       saveCachedContacts(PUBKEY, sampleContacts)
-      const raw = localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)
-      expect(raw).not.toBeNull()
-      expect(JSON.parse(raw!)).toEqual(sampleContacts)
+      expect(localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)).toBeNull()
     })
 
-    it('overwrites previous cache', () => {
-      saveCachedContacts(PUBKEY, sampleContacts)
-      const updated = [sampleContacts[0]]
-      saveCachedContacts(PUBKEY, updated)
-      expect(loadCachedContacts(PUBKEY)).toEqual(updated)
+    it('load returns empty', () => {
+      // Manually write data bypassing the guard
+      localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, JSON.stringify(sampleContacts))
+      expect(loadCachedContacts(PUBKEY)).toEqual([])
     })
   })
 
-  describe('loadCachedChats', () => {
-    it('returns empty array when no cache exists', () => {
-      expect(loadCachedChats(PUBKEY)).toEqual([])
+  describe('when cache enabled', () => {
+    beforeEach(() => {
+      setContactCacheEnabled(true)
     })
 
-    it('returns cached chats', () => {
-      saveCachedChats(PUBKEY, sampleChats)
-      expect(loadCachedChats(PUBKEY)).toEqual(sampleChats)
+    describe('loadCachedContacts', () => {
+      it('returns empty array when no cache exists', () => {
+        expect(loadCachedContacts(PUBKEY)).toEqual([])
+      })
+
+      it('returns cached contacts', () => {
+        saveCachedContacts(PUBKEY, sampleContacts)
+        expect(loadCachedContacts(PUBKEY)).toEqual(sampleContacts)
+      })
+
+      it('returns empty array for invalid JSON', () => {
+        localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, 'not-json')
+        expect(loadCachedContacts(PUBKEY)).toEqual([])
+      })
+
+      it('returns empty array for non-array JSON', () => {
+        localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, '{"key":"value"}')
+        expect(loadCachedContacts(PUBKEY)).toEqual([])
+      })
+
+      it('isolates cache by pubkey', () => {
+        const otherPubkey = 'd'.repeat(64)
+        saveCachedContacts(PUBKEY, sampleContacts)
+        expect(loadCachedContacts(otherPubkey)).toEqual([])
+      })
     })
 
-    it('returns empty array for invalid JSON', () => {
-      localStorage.setItem(`dodobox_chats_cache_${PUBKEY}`, '{broken')
-      expect(loadCachedChats(PUBKEY)).toEqual([])
-    })
-  })
+    describe('saveCachedContacts', () => {
+      it('persists contacts to localStorage', () => {
+        saveCachedContacts(PUBKEY, sampleContacts)
+        const raw = localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)
+        expect(raw).not.toBeNull()
+        expect(JSON.parse(raw!)).toEqual(sampleContacts)
+      })
 
-  describe('saveCachedChats', () => {
-    it('persists chats to localStorage', () => {
-      saveCachedChats(PUBKEY, sampleChats)
-      const raw = localStorage.getItem(`dodobox_chats_cache_${PUBKEY}`)
-      expect(raw).not.toBeNull()
-      expect(JSON.parse(raw!)).toEqual(sampleChats)
+      it('overwrites previous cache', () => {
+        saveCachedContacts(PUBKEY, sampleContacts)
+        const updated = [sampleContacts[0]]
+        saveCachedContacts(PUBKEY, updated)
+        expect(loadCachedContacts(PUBKEY)).toEqual(updated)
+      })
+    })
+
+    describe('loadCachedChats', () => {
+      it('returns empty array when no cache exists', () => {
+        expect(loadCachedChats(PUBKEY)).toEqual([])
+      })
+
+      it('returns cached chats', () => {
+        saveCachedChats(PUBKEY, sampleChats)
+        expect(loadCachedChats(PUBKEY)).toEqual(sampleChats)
+      })
+
+      it('returns empty array for invalid JSON', () => {
+        localStorage.setItem(`dodobox_chats_cache_${PUBKEY}`, '{broken')
+        expect(loadCachedChats(PUBKEY)).toEqual([])
+      })
+    })
+
+    describe('saveCachedChats', () => {
+      it('persists chats to localStorage', () => {
+        saveCachedChats(PUBKEY, sampleChats)
+        const raw = localStorage.getItem(`dodobox_chats_cache_${PUBKEY}`)
+        expect(raw).not.toBeNull()
+        expect(JSON.parse(raw!)).toEqual(sampleChats)
+      })
     })
   })
 })
