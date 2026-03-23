@@ -145,6 +145,9 @@ export class RealNostrAdapter implements INostrAdapter {
           ? { ...c, lastMsg: text, time: new Date().toISOString(), unread: 0 }
           : c
       )
+      if (this.session.currentPubkey) {
+        saveCachedChats(this.session.currentPubkey, this.chats)
+      }
 
       return { success: true, data: msg }
     } catch (error) {
