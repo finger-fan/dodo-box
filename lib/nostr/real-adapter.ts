@@ -15,32 +15,10 @@ import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './even
 import { relayPool } from './relay-client'
 import { defaultAvatar, shortPubkey } from '@/lib/utils'
 import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-counter'
+import { loadCachedContacts, saveCachedContacts, saveCachedChats } from './contact-cache'
 
 const MESSAGE_FETCH_LIMIT = 100
 const SUBSCRIPTION_TIMEOUT_MS = 5000
-const CONTACTS_CACHE_KEY = 'dodobox_contacts_cache'
-
-function loadCachedContacts(pubkey: string): NostrContact[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(`${CONTACTS_CACHE_KEY}_${pubkey}`)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed as NostrContact[]
-  } catch {
-    return []
-  }
-}
-
-function saveCachedContacts(pubkey: string, contacts: readonly NostrContact[]): void {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(`${CONTACTS_CACHE_KEY}_${pubkey}`, JSON.stringify(contacts))
-  } catch {
-    // localStorage full or unavailable — non-critical
-  }
-}
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -267,6 +245,9 @@ export class RealNostrAdapter implements INostrAdapter {
       unread: 0,
       avatar: c.avatar || '',
     }))
+    if (this.session.currentPubkey) {
+      saveCachedChats(this.session.currentPubkey, this.chats)
+    }
   }
 
   async addContact(pubkeyOrNpub: string): Promise<NostrResult<NostrContact>> {
