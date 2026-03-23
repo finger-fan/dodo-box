@@ -47,7 +47,9 @@
     "ttl_permanent": "Permanent",
     "switched_identity": "Switched identity",
     "identity_deleted": "Identity deleted",
-    "coming_soon": "Coming soon"
+    "coming_soon": "Coming soon",
+    "contact_cache": "Contact Cache",
+    "contact_cache_desc": "Cache contact names locally to reduce loading delay. Disable for maximum privacy."
   },
   "contacts": {
     "add_contact": "Add Contact",

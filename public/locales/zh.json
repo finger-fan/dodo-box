@@ -47,7 +47,9 @@
     "ttl_permanent": "永久",
     "switched_identity": "已切换身份",
     "identity_deleted": "身份已删除",
-    "coming_soon": "即将推出"
+    "coming_soon": "即将推出",
+    "contact_cache": "联系人缓存",
+    "contact_cache_desc": "本地缓存联系人名称以减少加载延迟。关闭可获得最大隐私保护。"
   },
   "contacts": {
     "add_contact": "添加联系人",

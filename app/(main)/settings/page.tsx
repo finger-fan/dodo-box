@@ -16,6 +16,7 @@ import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
+import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
 
 const TTL_OPTIONS = [
   { value: 600, labelKey: 'settings.ttl_10min' },
@@ -46,6 +47,7 @@ export default function SettingsPage() {
     }
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
+  const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
   const updater = useUpdater();
   const isNative = mounted && Capacitor.isNativePlatform();
 
@@ -144,7 +146,7 @@ export default function SettingsPage() {
                 >ZH</button>
               </div>
             </div>
-            <div className="theme-menu flex items-center justify-between p-4">
+            <div className="theme-menu flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
               <div className="flex items-center gap-3">
                 <Moon className="w-5 h-5 text-zinc-400" />
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.theme')}</span>
@@ -154,6 +156,31 @@ export default function SettingsPage() {
                 <button onClick={() => setTheme('system')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", theme === 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.system')}</button>
                 <button onClick={() => setTheme('dark')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'dark' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.dark')}</button>
               </div>
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.contact_cache')}</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.contact_cache_desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !cacheEnabled;
+                  setContactCacheEnabled(next);
+                  setCacheEnabled(next);
+                }}
+                className={cn(
+                  "relative w-10 h-6 rounded-full transition-colors",
+                  cacheEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  cacheEnabled ? "left-[18px]" : "left-0.5"
+                )} />
+              </button>
             </div>
           </div>
         </section>
