@@ -4,6 +4,45 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.7 — 2026-03-24
+
+### Bug Fixes
+- **联系人名称缓存**：将联系人缓存到 localStorage，防止联系人名称在刷新后恢复为 hex 公钥
+- **联系人去重**：改进联系人获取逻辑，避免重复请求
+- **Updater 生命周期**：修复 updater 在组件卸载后的状态管理问题
+
+### Features
+- **序列间隙检测**：新增 `seq-counter.ts` 和 `gap-detection.ts`，实现消息序列间隙检测和恢复
+- **发送状态指示器**：消息发送时显示状态（发送中/成功/失败）
+- **Android Capacitor 构建**：新增完整的 Android Capacitor 项目结构和构建脚本
+- **OTA 热更新**：集成 `@capgo/capacitor-updater` 实现 OTA 热更新
+- **E2E 测试基础设施**：新增 Playwright 全局 setup/teardown、多用户聊天 fixture 和测试页面对象
+- **多用户聊天测试**：新增 `multi-user-chat.spec.ts` 测试多账户间聊天场景
+
+### Improvements
+- **部署流程重构**：调整部署管道，先构建 Docker 镜像再提交，确保构建成功后才推送
+- **文档完善**：新增 bug-fix-checklist.md、codebase-investigation.md 和 feature-table.md
+
+### Tests
+- **contact-cache.test.ts** (新增)：联系人缓存模块单元测试
+- **gap-detection.test.ts** (新增)：间隙检测模块单元测试
+- **seq-counter.test.ts** (新增)：序列计数器单元测试
+- **nostr-adapter.test.ts** (新增)：Nostr 适配器集成测试
+
+### Changed Files
+- `lib/nostr/contact-cache.ts` — 新建联系人缓存模块
+- `lib/nostr/gap-detection.ts` — 新建间隙检测模块
+- `lib/nostr/seq-counter.ts` — 新建序列计数器模块
+- `hooks/nostr/use-messages.ts` — 新增间隙检测和发送状态
+- `app/(main)/messages/[id]/chat-view.tsx` — 新增聊天视图组件
+- `components/UpdateChecker.tsx` — 新建更新检查组件
+- `hooks/use-updater.ts` — 新建 updater hook
+- `lib/updater.ts` — 新建更新逻辑模块
+- `android/` — 新增完整的 Capacitor Android 项目
+- `tests/e2e/` — 新增 E2E 测试文件和 fixtures
+
+---
+
 ## v0.8.6 — 2026-03-22
 
 ### Bug Fixes
