@@ -1,0 +1,23 @@
+# Test-only compose: strfry relay on port 7778 with tmpfs (auto-cleared each run)
+services:
+  relay-test:
+    image: ghcr.io/hoytech/strfry:latest
+    container_name: dodo-box-relay-test
+    ports:
+      - "127.0.0.1:7778:7777"
+    volumes:
+      - ./docker/strfry.conf:/app/strfry.conf:ro
+    tmpfs:
+      - /app/strfry-db:size=64M
+    command: ["--config", "/app/strfry.conf", "relay"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7777 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
