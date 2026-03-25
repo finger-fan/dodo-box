@@ -106,6 +106,16 @@ describe('buildDirectMessageEvent', () => {
     const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey)
     expect(event.tags[0]).toEqual(['p', RECIPIENT.publicKey])
   })
+
+  it('includes seq tag when seq is provided', () => {
+    const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey, 5)
+    expect(event.tags).toContainEqual(['seq', '5'])
+  })
+
+  it('omits seq tag when seq is undefined', () => {
+    const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey)
+    expect(event.tags.some(t => t[0] === 'seq')).toBe(false)
+  })
 })
 
 describe('createGiftWrap / decryptGiftWrap', () => {

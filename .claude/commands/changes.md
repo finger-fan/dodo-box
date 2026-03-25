@@ -27,10 +27,12 @@ git log --oneline -5
 
 ## Step 2 — Display summary
 
-First show a high-level overview:
-- Current branch: `$(git branch --show-current)`
-- Last commit: `$(git log --oneline -1 --no-decorate)`
-- Working tree status: Clean / Modified / Untracked files present
+First show a high-level overview in Chinese:
+- 当前分支: `$(git branch --show-current)`
+- 最新提交: `$(git log --oneline -1 --no-decorate)`
+- 工作区状态: 干净 / 有修改 / 有未跟踪文件
+
+Announce: "📋 变更摘要 | 分支: <branch> | 状态: <status>"
 
 ## Step 3 — List modified files
 

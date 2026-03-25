@@ -30,12 +30,16 @@ export interface DerivedKey {
   nsec: string
 }
 
+export type DeliveryStatus = 'pending' | 'sent' | 'failed'
+
 export interface NostrMessage {
   id: string
   text: string
   sender: 'me' | 'them'
   timestamp: Date
   senderPubkey?: string
+  seq?: number
+  sendStatus?: DeliveryStatus
 }
 
 export interface NostrChat {
@@ -112,6 +116,11 @@ export interface INostrAdapter {
   updateProfile(profile: Partial<NostrProfile>): Promise<NostrResult>
   getRelays(): string[]
   setRelays(relays: string[]): Promise<NostrResult>
+  recoverMessages(
+    contactPubkey: string,
+    since: number,
+    until: number
+  ): Promise<NostrMessage[]>
 }
 
 export const VAULT_ERROR_CODES = {

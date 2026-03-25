@@ -81,6 +81,9 @@ function createTestAdapter(): INostrAdapter {
     async setRelays(): Promise<NostrResult> {
       return { success: true, data: undefined }
     },
+    async recoverMessages(): Promise<NostrMessage[]> {
+      return []
+    },
   }
 }
 
@@ -176,29 +179,28 @@ describe('useMessages', () => {
       wrapper: makeWrapper(adapter),
     })
 
-    let resultValue: Awaited<ReturnType<typeof result.current.sendMessage>> | undefined
     await act(async () => {
-      resultValue = await result.current.sendMessage('hi')
+      await result.current.sendMessage('hi')
     })
 
-    expect(resultValue!.success).toBe(true)
+    // sendMessage returns void; success is reflected via optimistic messages in state
+    expect(result.current.messages.length).toBeGreaterThan(0)
   })
 
-  it('sendMessage with empty text returns failure', async () => {
+  it('sendMessage with empty text is a no-op', async () => {
+    const sendSpy = vi.spyOn(adapter, 'sendMessage')
     const { result } = renderHook(() => useMessages(ALICE_PUBKEY), {
       wrapper: makeWrapper(adapter),
     })
 
-    let resultValue: Awaited<ReturnType<typeof result.current.sendMessage>> | undefined
     await act(async () => {
-      resultValue = await result.current.sendMessage('   ')
+      await result.current.sendMessage('   ')
     })
 
-    expect(resultValue!.success).toBe(false)
-    expect(!resultValue!.success && resultValue!.error).toBeTruthy()
+    expect(sendSpy).not.toHaveBeenCalled()
   })
 
-  it('sendMessage removes optimistic message on adapter failure', async () => {
+  it('sendMessage marks optimistic message as failed on adapter failure', async () => {
     const failAdapter = createTestAdapter()
     vi.spyOn(failAdapter, 'sendMessage').mockResolvedValue({
       success: false,
@@ -216,9 +218,11 @@ describe('useMessages', () => {
       await result.current.sendMessage('will fail')
     })
 
-    // Optimistic message should be removed
-    expect(result.current.messages.length).toBe(initialCount)
-    expect(result.current.messages.some(m => m.text === 'will fail')).toBe(false)
+    // Failed message should be kept with sendStatus: 'failed'
+    expect(result.current.messages.length).toBe(initialCount + 1)
+    const failedMsg = result.current.messages.find(m => m.text === 'will fail')
+    expect(failedMsg).toBeDefined()
+    expect(failedMsg!.sendStatus).toBe('failed')
   })
 
   it('isSending is true during send, false after', async () => {

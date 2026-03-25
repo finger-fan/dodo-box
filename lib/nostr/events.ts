@@ -57,9 +57,13 @@ export function buildFollowListEvent(
 export function buildDirectMessageEvent(
   content: string,
   recipientPubkey: string,
-  senderPrivkeyHex: string
+  senderPrivkeyHex: string,
+  seq?: number
 ): NostrEvent {
-  const tags = [['p', recipientPubkey]]
+  const tags: string[][] = [['p', recipientPubkey]]
+  if (seq !== undefined) {
+    tags.push(['seq', String(seq)])
+  }
   return signEvent(KIND_DIRECT_MESSAGE, content, tags, senderPrivkeyHex)
 }
 

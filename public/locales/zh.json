@@ -47,7 +47,9 @@
     "ttl_permanent": "永久",
     "switched_identity": "已切换身份",
     "identity_deleted": "身份已删除",
-    "coming_soon": "即将推出"
+    "coming_soon": "即将推出",
+    "contact_cache": "联系人缓存",
+    "contact_cache_desc": "本地缓存联系人名称以减少加载延迟。关闭可获得最大隐私保护。"
   },
   "contacts": {
     "add_contact": "添加联系人",
@@ -65,7 +67,11 @@
     "online": "在线",
     "no_messages": "暂无消息",
     "today": "今天",
-    "type_message": "输入消息..."
+    "type_message": "输入消息...",
+    "missing_messages": "可能缺少 {{count}} 条消息，点击尝试恢复",
+    "recovering_messages": "正在恢复消息...",
+    "recovery_failed": "无法恢复消息",
+    "send_failed": "发送失败，点击重试"
   },
   "discover": {
     "title": "发现",
@@ -77,6 +83,16 @@
     "unsubscribe": "取消订阅",
     "no_posts": "该频道暂无动态",
     "search_channels": "搜索频道..."
+  },
+  "updater": {
+    "section_title": "应用更新",
+    "current_version": "当前版本",
+    "check_update": "检查更新",
+    "checking": "检查中...",
+    "reset_builtin": "恢复出厂版本",
+    "new_version": "v{{version}} 可用",
+    "downloading": "下载中...",
+    "update": "更新"
   },
   "error": {
     "title": "出现了问题",

@@ -8,5 +8,22 @@ coverage/
 !.env.example
 playwright-report/
 test-results/
+tests/e2e/screenshots/
 tsconfig.tsbuildinfo
 root_claude_settings
+
+# Capacitor Android build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+
+# Static export
+out/
+.cap-backup/
+
+# Keystore
+android/sign-key/
+*.keystore
+*.jks

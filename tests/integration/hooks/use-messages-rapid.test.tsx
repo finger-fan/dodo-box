@@ -74,6 +74,9 @@ function createDelayedAdapter(delayMs = 0): INostrAdapter {
     async setRelays(): Promise<NostrResult> {
       return { success: true, data: undefined }
     },
+    async recoverMessages(): Promise<NostrMessage[]> {
+      return []
+    },
   }
 }
 
@@ -246,10 +249,12 @@ describe('useMessages - rapid send scenarios', () => {
     })
 
     const msgs = result.current.messages
-    // 3 succeeded (even calls: 2, 4, 6), 3 failed (odd calls: 1, 3, 5)
-    expect(msgs.length).toBe(3)
-    // No optimistic- IDs should remain
-    expect(msgs.every((m) => !m.id.startsWith('optimistic-'))).toBe(true)
+    // 3 succeeded (even calls: 2, 4, 6), 3 failed (odd calls: 1, 3, 5) — all kept
+    expect(msgs.length).toBe(6)
+    const succeeded = msgs.filter(m => !m.id.startsWith('optimistic-'))
+    const failed = msgs.filter(m => m.sendStatus === 'failed')
+    expect(succeeded.length).toBe(3)
+    expect(failed.length).toBe(3)
   })
 
   it('messages maintain send order', async () => {

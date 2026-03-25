@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   UserCircle, LogOut, Globe, Moon, Shield,
   Trash2, Download, ChevronRight, Clock,
+  RefreshCw, RotateCcw, Loader2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
@@ -13,6 +14,9 @@ import IdentityModal from '@/components/settings/IdentityModal';
 import { cn, shortPubkey } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
+import { useUpdater } from '@/hooks/use-updater';
+import { Capacitor } from '@capacitor/core';
+import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
 
 const TTL_OPTIONS = [
   { value: 600, labelKey: 'settings.ttl_10min' },
@@ -43,6 +47,9 @@ export default function SettingsPage() {
     }
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
+  const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
+  const updater = useUpdater();
+  const isNative = mounted && Capacitor.isNativePlatform();
 
   const identities = session.vaultData?.identities || [];
   const activeIdentity = identities.find(i => i.pubkey === session.currentPubkey);
@@ -139,7 +146,7 @@ export default function SettingsPage() {
                 >ZH</button>
               </div>
             </div>
-            <div className="theme-menu flex items-center justify-between p-4">
+            <div className="theme-menu flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
               <div className="flex items-center gap-3">
                 <Moon className="w-5 h-5 text-zinc-400" />
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.theme')}</span>
@@ -149,6 +156,31 @@ export default function SettingsPage() {
                 <button onClick={() => setTheme('system')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", theme === 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.system')}</button>
                 <button onClick={() => setTheme('dark')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'dark' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.dark')}</button>
               </div>
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.contact_cache')}</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.contact_cache_desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !cacheEnabled;
+                  setContactCacheEnabled(next);
+                  setCacheEnabled(next);
+                }}
+                className={cn(
+                  "relative w-10 h-6 rounded-full transition-colors",
+                  cacheEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  cacheEnabled ? "left-[18px]" : "left-0.5"
+                )} />
+              </button>
             </div>
           </div>
         </section>
@@ -216,6 +248,50 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        {/* App Update (native only) */}
+        {isNative && (
+          <section className="space-y-3">
+            <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('updater.section_title')}</div>
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-zinc-50 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-zinc-400" />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('updater.current_version')}</span>
+                      <span className="ml-2 text-xs font-mono text-zinc-500">{process.env.NEXT_PUBLIC_APP_VERSION ?? '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 flex gap-2">
+                <button
+                  onClick={updater.check}
+                  disabled={updater.checking}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+                >
+                  {updater.checking ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {t('updater.checking')}</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" /> {t('updater.check_update')}</>
+                  )}
+                </button>
+                <button
+                  onClick={updater.reset}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" /> {t('updater.reset_builtin')}
+                </button>
+              </div>
+              {updater.error && (
+                <div className="px-4 pb-4">
+                  <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-2 rounded-lg">{updater.error}</div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
 
       <IdentityModal

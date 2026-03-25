@@ -53,4 +53,8 @@ export class EmptyNostrAdapter implements INostrAdapter {
   async setRelays(): Promise<NostrResult> {
     return { success: false, error: 'Not authenticated' }
   }
+
+  async recoverMessages(): Promise<NostrMessage[]> {
+    return []
+  }
 }

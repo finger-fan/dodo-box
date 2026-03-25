@@ -47,7 +47,9 @@
     "ttl_permanent": "Permanent",
     "switched_identity": "Switched identity",
     "identity_deleted": "Identity deleted",
-    "coming_soon": "Coming soon"
+    "coming_soon": "Coming soon",
+    "contact_cache": "Contact Cache",
+    "contact_cache_desc": "Cache contact names locally to reduce loading delay. Disable for maximum privacy."
   },
   "contacts": {
     "add_contact": "Add Contact",
@@ -65,7 +67,11 @@
     "online": "Online",
     "no_messages": "No messages yet",
     "today": "Today",
-    "type_message": "Type a message..."
+    "type_message": "Type a message...",
+    "missing_messages": "{{count}} message(s) may be missing. Tap to recover.",
+    "recovering_messages": "Recovering messages...",
+    "recovery_failed": "Could not recover messages",
+    "send_failed": "Failed to send. Tap to retry."
   },
   "discover": {
     "title": "Discover",
@@ -77,6 +83,16 @@
     "unsubscribe": "Unsubscribe",
     "no_posts": "No posts found in this channel",
     "search_channels": "Search channels..."
+  },
+  "updater": {
+    "section_title": "App Update",
+    "current_version": "Current Version",
+    "check_update": "Check Update",
+    "checking": "Checking...",
+    "reset_builtin": "Reset to Factory",
+    "new_version": "v{{version}} available",
+    "downloading": "Downloading...",
+    "update": "Update"
   },
   "error": {
     "title": "Something went wrong",
