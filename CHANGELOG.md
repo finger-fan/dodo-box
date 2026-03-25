@@ -4,6 +4,24 @@ All notable changes to dodo-box are documented here.
 
 ---
 
+## v0.8.8 — 2026-03-25
+
+### Features
+- **changes 命令中文化**：将 `/changes` 命令输出改为中文
+- **worktree-flow 命令**：新增 `/worktree-flow` 命令支持 worktree 开发工作流
+- **pull 命令**：新增 `/pull` 命令支持从远程拉取变更
+
+### Bug Fixes
+- **ESLint 配置**：添加 ignores 配置，排除构建产物和依赖目录
+
+### Changed Files
+- `.claude/commands/changes.md` — 输出改为中文
+- `.claude/commands/worktree-flow.md` — 新增 worktree 工作流命令
+- `.claude/commands/pull.md` — 新增 pull 命令
+- `eslint.config.mjs` — 添加 ignores 配置
+
+---
+
 ## v0.8.7 — 2026-03-24
 
 ### Bug Fixes
