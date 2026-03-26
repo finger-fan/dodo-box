@@ -1,4 +1,4 @@
-// real-adapter.ts - 真实 Nostr 适配器
+// real-adapter.ts - Real Nostr adapter using welshman relay management
 
 import type {
   INostrAdapter,
@@ -11,14 +11,30 @@ import type {
   NostrFilter,
 } from './types'
 import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
-import { buildDirectMessageEvent, createGiftWrap, decryptGiftWrap } from './events'
-import { relayPool } from './relay-client'
 import { defaultAvatar, shortPubkey } from '@/lib/utils'
 import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-counter'
 import { loadCachedContacts, saveCachedContacts, saveCachedChats } from './contact-cache'
 
+// Welshman imports
+import {
+  connectToRelays,
+  publishEvent,
+  fetchEvents,
+  subscribe as welshmanSubscribe,
+  getConnectedRelays,
+} from '@/lib/welshman/relay-manager'
+import {
+  buildDirectMessageEvent,
+  createGiftWrap,
+  decryptGiftWrap,
+  buildFollowListEvent,
+  buildProfileEvent,
+  buildVaultEvent,
+  signEvent,
+} from '@/lib/welshman/crypto'
+import type { TrustedEvent, SignedEvent } from '@welshman/util'
+
 const MESSAGE_FETCH_LIMIT = 100
-const SUBSCRIPTION_TIMEOUT_MS = 5000
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -43,7 +59,6 @@ export class RealNostrAdapter implements INostrAdapter {
   }
 
   private get privkey(): string {
-    // privkey is stored in an external ref, passed via session
     return (this.session as NostrSession & { currentPrivkey?: string }).currentPrivkey || ''
   }
 
@@ -68,45 +83,42 @@ export class RealNostrAdapter implements INostrAdapter {
       },
     ]
 
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    return new Promise((resolve) => {
-      const subId = `msgs-${contactPubkey.slice(0, 8)}-${Date.now()}`
-      const timeout = setTimeout(() => {
-        relayPool.unsubscribe(subId)
-        messages.sort((a, b) => {
-          const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
-          if (timeDiff !== 0) return timeDiff
-          if (a.senderPubkey && a.senderPubkey === b.senderPubkey) {
-            return (a.seq ?? 0) - (b.seq ?? 0)
-          }
-          return 0
-        })
-        recoverSeqCounter(this.session.currentPubkey!, contactPubkey, messages)
-        resolve(messages)
-      }, SUBSCRIPTION_TIMEOUT_MS)
+    const events = await fetchEvents(filters, this.relayUrls)
 
-      relayPool.subscribe(subId, filters, (event) => {
-        const innerEvent = decryptGiftWrap(event, this.privkey)
-        if (!innerEvent) return
+    for (const event of events) {
+      const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
+      if (!innerEvent) continue
 
-        const isFromContact = innerEvent.pubkey === contactPubkey
-        const isFromMe =
-          innerEvent.pubkey === this.session.currentPubkey &&
-          innerEvent.tags.some(t => t[0] === 'p' && t[1] === contactPubkey)
+      const isFromContact = innerEvent.pubkey === contactPubkey
+      const isFromMe =
+        innerEvent.pubkey === this.session.currentPubkey &&
+        innerEvent.tags.some(t => t[0] === 'p' && t[1] === contactPubkey)
 
-        if (!isFromContact && !isFromMe) return
+      if (!isFromContact && !isFromMe) continue
 
-        messages.push({
-          id: innerEvent.id,
-          text: innerEvent.content,
-          sender: isFromMe ? 'me' : 'them',
-          timestamp: new Date(innerEvent.created_at * 1000),
-          senderPubkey: innerEvent.pubkey,
-          seq: parseSeqTag(innerEvent.tags),
-        })
+      messages.push({
+        id: innerEvent.id,
+        text: innerEvent.content,
+        sender: isFromMe ? 'me' : 'them',
+        timestamp: new Date(innerEvent.created_at * 1000),
+        senderPubkey: innerEvent.pubkey,
+        seq: parseSeqTag(innerEvent.tags),
       })
+    }
+
+    messages.sort((a, b) => {
+      const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
+      if (timeDiff !== 0) return timeDiff
+      if (a.senderPubkey && a.senderPubkey === b.senderPubkey) {
+        return (a.seq ?? 0) - (b.seq ?? 0)
+      }
+      return 0
     })
+
+    recoverSeqCounter(this.session.currentPubkey!, contactPubkey, messages)
+    return messages
   }
 
   async sendMessage(
@@ -122,13 +134,13 @@ export class RealNostrAdapter implements INostrAdapter {
       const innerEvent = buildDirectMessageEvent(text, contactPubkey, this.privkey, seq)
 
       // Two gift wraps: one for recipient, one for sender
-      const wrapForRecipient = createGiftWrap(innerEvent, contactPubkey)
-      const wrapForSelf = createGiftWrap(innerEvent, this.session.currentPubkey)
+      const wrapForRecipient = await createGiftWrap(innerEvent, contactPubkey, this.privkey)
+      const wrapForSelf = await createGiftWrap(innerEvent, this.session.currentPubkey, this.privkey)
 
-      // relayPool.connect is idempotent but skipped here since connections
-      // are established during getContacts/getMessages which run before send
-      const recipientOk = await relayPool.publish(wrapForRecipient)
-      await relayPool.publish(wrapForSelf)
+      const recipientResults = await publishEvent(wrapForRecipient, this.relayUrls)
+      await publishEvent(wrapForSelf, this.relayUrls)
+
+      const anySuccess = Object.values(recipientResults).some(r => r.status === 'success')
 
       const msg: NostrMessage = {
         id: innerEvent.id,
@@ -136,7 +148,7 @@ export class RealNostrAdapter implements INostrAdapter {
         sender: 'me',
         timestamp: new Date(innerEvent.created_at * 1000),
         seq,
-        sendStatus: recipientOk ? 'sent' : 'failed',
+        sendStatus: anySuccess ? 'sent' : 'failed',
       }
 
       // Update last message
@@ -162,7 +174,6 @@ export class RealNostrAdapter implements INostrAdapter {
   ): () => void {
     if (!this.session.currentPubkey || !this.privkey) return () => {}
 
-    const subId = `sub-${contactPubkey.slice(0, 8)}-${Date.now()}`
     const filters: NostrFilter[] = [
       {
         kinds: [KIND_DM_WRAP],
@@ -171,9 +182,11 @@ export class RealNostrAdapter implements INostrAdapter {
       },
     ]
 
-    relayPool.connect(this.relayUrls).then(() => {
-      relayPool.subscribe(subId, filters, (event) => {
-        const innerEvent = decryptGiftWrap(event, this.privkey)
+    const controller = welshmanSubscribe(
+      filters,
+      this.relayUrls,
+      async (event: TrustedEvent) => {
+        const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
         if (!innerEvent || innerEvent.pubkey !== contactPubkey) return
 
         callback({
@@ -184,10 +197,10 @@ export class RealNostrAdapter implements INostrAdapter {
           senderPubkey: innerEvent.pubkey,
           seq: parseSeqTag(innerEvent.tags),
         })
-      })
-    })
+      }
+    )
 
-    return () => relayPool.unsubscribe(subId)
+    return () => controller.abort()
   }
 
   async getContacts(): Promise<NostrContact[]> {
@@ -203,16 +216,13 @@ export class RealNostrAdapter implements INostrAdapter {
       },
     ]
 
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    this.contactsFetchPromise = new Promise((resolve) => {
-      const subId = `contacts-${Date.now()}`
-      const timeout = setTimeout(() => {
-        relayPool.unsubscribe(subId)
-        resolve(this.contacts)
-      }, SUBSCRIPTION_TIMEOUT_MS)
+    this.contactsFetchPromise = fetchEvents(filters, this.relayUrls).then((events) => {
+      if (events.length > 0) {
+        // Use the most recent event
+        const event = events.sort((a, b) => b.created_at - a.created_at)[0]
 
-      relayPool.subscribe(subId, filters, (event) => {
         const contactTags = event.tags
           .filter(t => t[0] === 'p' && t[1])
           .map(t => ({ pubkey: t[1], petname: t[3] || '' }))
@@ -228,11 +238,8 @@ export class RealNostrAdapter implements INostrAdapter {
         if (this.session.currentPubkey) {
           saveCachedContacts(this.session.currentPubkey, this.contacts)
         }
-
-        clearTimeout(timeout)
-        relayPool.unsubscribe(subId)
-        resolve(this.contacts)
-      })
+      }
+      return this.contacts
     })
 
     return this.contactsFetchPromise
@@ -302,12 +309,11 @@ export class RealNostrAdapter implements INostrAdapter {
 
     // Publish new kind 3 follows list with petnames
     if (this.privkey) {
-      const { buildFollowListEvent } = await import('./events')
       const event = buildFollowListEvent(
         this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
-      await relayPool.publish(event)
+      await publishEvent(event, this.relayUrls)
     }
 
     return { success: true, data: newContact }
@@ -326,56 +332,45 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     if (this.privkey) {
-      const { buildFollowListEvent } = await import('./events')
       const event = buildFollowListEvent(
         this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
         this.privkey
       )
-      await relayPool.publish(event)
+      await publishEvent(event, this.relayUrls)
     }
 
     return { success: true, data: undefined }
   }
 
   async getProfile(pubkey: string): Promise<NostrProfile | null> {
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    return new Promise((resolve) => {
-      const subId = `profile-${pubkey.slice(0, 8)}-${Date.now()}`
-      const filters: NostrFilter[] = [
-        { kinds: [KIND_PROFILE], authors: [pubkey], limit: 1 },
-      ]
+    const filters: NostrFilter[] = [
+      { kinds: [KIND_PROFILE], authors: [pubkey], limit: 1 },
+    ]
 
-      const timeout = setTimeout(() => {
-        relayPool.unsubscribe(subId)
-        resolve(null)
-      }, SUBSCRIPTION_TIMEOUT_MS)
+    const events = await fetchEvents(filters, this.relayUrls)
+    if (events.length === 0) return null
 
-      relayPool.subscribe(subId, filters, (event) => {
-        clearTimeout(timeout)
-        relayPool.unsubscribe(subId)
-        try {
-          const meta = JSON.parse(event.content)
-          resolve({
-            pubkey,
-            name: meta.name,
-            displayName: meta.display_name || meta.name,
-            picture: meta.picture,
-            about: meta.about,
-            nip05: meta.nip05,
-          })
-        } catch {
-          resolve(null)
-        }
-      })
-    })
+    try {
+      const meta = JSON.parse(events[0].content)
+      return {
+        pubkey,
+        name: meta.name,
+        displayName: meta.display_name || meta.name,
+        picture: meta.picture,
+        about: meta.about,
+        nip05: meta.nip05,
+      }
+    } catch {
+      return null
+    }
   }
 
   async updateProfile(profile: Partial<NostrProfile>): Promise<NostrResult> {
     if (!this.privkey) return { success: false, error: 'Not authenticated' }
 
     try {
-      const { buildProfileEvent } = await import('./events')
       const event = buildProfileEvent(
         {
           name: profile.name || '',
@@ -386,8 +381,8 @@ export class RealNostrAdapter implements INostrAdapter {
         },
         this.privkey
       )
-      await relayPool.connect(this.relayUrls)
-      await relayPool.publish(event)
+      connectToRelays(this.relayUrls)
+      await publishEvent(event, this.relayUrls)
       return { success: true, data: undefined }
     } catch (error) {
       return { success: false, error: String(error) }
@@ -405,7 +400,6 @@ export class RealNostrAdapter implements INostrAdapter {
   ): Promise<NostrMessage[]> {
     if (!this.session.currentPubkey || !this.privkey) return []
 
-    const RECOVERY_TIMEOUT_MS = 8000
     const messages: NostrMessage[] = []
     const filters: NostrFilter[] = [
       {
@@ -416,42 +410,41 @@ export class RealNostrAdapter implements INostrAdapter {
       },
     ]
 
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    return new Promise((resolve) => {
-      const subId = `recover-${contactPubkey.slice(0, 8)}-${Date.now()}`
-      const timeout = setTimeout(() => {
-        relayPool.unsubscribe(subId)
-        resolve(messages)
-      }, RECOVERY_TIMEOUT_MS)
+    const events = await fetchEvents(filters, this.relayUrls)
 
-      relayPool.subscribe(subId, filters, (event) => {
-        const innerEvent = decryptGiftWrap(event, this.privkey)
-        if (!innerEvent) return
+    for (const event of events) {
+      const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
+      if (!innerEvent) continue
 
-        const isFromContact = innerEvent.pubkey === contactPubkey
-        const isFromMe =
-          innerEvent.pubkey === this.session.currentPubkey &&
-          innerEvent.tags.some(t => t[0] === 'p' && t[1] === contactPubkey)
+      const isFromContact = innerEvent.pubkey === contactPubkey
+      const isFromMe =
+        innerEvent.pubkey === this.session.currentPubkey &&
+        innerEvent.tags.some(t => t[0] === 'p' && t[1] === contactPubkey)
 
-        if (!isFromContact && !isFromMe) return
+      if (!isFromContact && !isFromMe) continue
 
-        messages.push({
-          id: innerEvent.id,
-          text: innerEvent.content,
-          sender: isFromMe ? 'me' : 'them',
-          timestamp: new Date(innerEvent.created_at * 1000),
-          senderPubkey: innerEvent.pubkey,
-          seq: parseSeqTag(innerEvent.tags),
-        })
+      messages.push({
+        id: innerEvent.id,
+        text: innerEvent.content,
+        sender: isFromMe ? 'me' : 'them',
+        timestamp: new Date(innerEvent.created_at * 1000),
+        senderPubkey: innerEvent.pubkey,
+        seq: parseSeqTag(innerEvent.tags),
       })
-    })
+    }
+
+    return messages
   }
 
   async setRelays(relays: string[]): Promise<NostrResult> {
     this.relayUrls = [...relays]
-    relayPool.closeAll()
-    await relayPool.connect(relays)
+    closeAllRelays()
+    connectToRelays(relays)
     return { success: true, data: undefined }
   }
 }
+
+// Import for setRelays
+import { closeAllRelays } from '@/lib/welshman/relay-manager'

@@ -119,32 +119,32 @@ describe('buildDirectMessageEvent', () => {
 })
 
 describe('createGiftWrap / decryptGiftWrap', () => {
-  it('creates kind 1059 wrap event', () => {
+  it('creates kind 1059 wrap event', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     expect(wrap.kind).toBe(KIND_DM_WRAP)
   })
 
-  it('wrap event tags recipient pubkey', () => {
+  it('wrap event tags recipient pubkey', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     expect(wrap.tags.some(t => t[0] === 'p' && t[1] === RECIPIENT.publicKey)).toBe(true)
   })
 
-  it('decrypts gift wrap to recover inner event', () => {
+  it('decrypts gift wrap to recover inner event', async () => {
     const inner = buildDirectMessageEvent('my secret message', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
-    const decrypted = decryptGiftWrap(wrap, RECIPIENT.privateKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
+    const decrypted = await decryptGiftWrap(wrap, RECIPIENT.privateKey)
     expect(decrypted).not.toBeNull()
     expect(decrypted!.content).toBe('my secret message')
     expect(decrypted!.kind).toBe(KIND_DIRECT_MESSAGE)
   })
 
-  it('returns null when decrypting with wrong key', () => {
+  it('returns null when decrypting with wrong key', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     const wrongKey = generateNewIdentityKey().privateKey
-    const result = decryptGiftWrap(wrap, wrongKey)
+    const result = await decryptGiftWrap(wrap, wrongKey)
     expect(result).toBeNull()
   })
 })

@@ -1,26 +1,28 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { NostrEvent, NostrFilter } from '@/lib/nostr/types'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { NostrEvent } from '@/lib/nostr/types'
 import { shortPubkey } from '@/lib/utils'
 
-const { mockRelayPool } = vi.hoisted(() => {
-  const mockRelayPool = {
-    connect: vi.fn().mockResolvedValue(undefined),
-    publish: vi.fn().mockResolvedValue(true),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    closeAll: vi.fn(),
-    getConnectedRelays: vi.fn().mockReturnValue([]),
-  }
-  return { mockRelayPool }
-})
-
-vi.mock('@/lib/nostr/relay-client', () => ({
-  relayPool: mockRelayPool,
-  RelayClient: vi.fn(),
-  RelayPool: vi.fn(),
+const { mockFetchEvents, mockPublishEvent, mockConnectToRelays } = vi.hoisted(() => ({
+  mockFetchEvents: vi.fn().mockResolvedValue([]),
+  mockPublishEvent: vi.fn().mockResolvedValue({
+    'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+  }),
+  mockConnectToRelays: vi.fn(),
 }))
 
-vi.mock('@/lib/nostr/events', () => ({
+vi.mock('@/lib/welshman/relay-manager', () => ({
+  connectToRelays: mockConnectToRelays,
+  publishEvent: mockPublishEvent,
+  fetchEvents: mockFetchEvents,
+  subscribe: vi.fn().mockReturnValue({ abort: vi.fn(), signal: { aborted: false } }),
+  getConnectedRelays: vi.fn().mockReturnValue([]),
+  closeAllRelays: vi.fn(),
+}))
+
+vi.mock('@/lib/welshman/crypto', () => ({
+  buildDirectMessageEvent: vi.fn(),
+  createGiftWrap: vi.fn().mockResolvedValue({ kind: 1059 }),
+  decryptGiftWrap: vi.fn().mockResolvedValue(null),
   buildFollowListEvent: vi.fn(() => ({
     id: 'follow-evt-1',
     pubkey: 'a'.repeat(64),
@@ -30,9 +32,9 @@ vi.mock('@/lib/nostr/events', () => ({
     content: '',
     sig: 'sig'.padEnd(128, '0'),
   })),
-  buildDirectMessageEvent: vi.fn(),
-  createGiftWrap: vi.fn(),
-  decryptGiftWrap: vi.fn(),
+  buildProfileEvent: vi.fn(),
+  buildVaultEvent: vi.fn(),
+  signEvent: vi.fn(),
 }))
 
 import { RealNostrAdapter } from '@/lib/nostr/real-adapter'
@@ -57,11 +59,6 @@ function createAdapter(): RealNostrAdapter {
 describe('RealNostrAdapter.getContacts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('returns contacts from relay subscription', async () => {
@@ -78,11 +75,7 @@ describe('RealNostrAdapter.getContacts', () => {
       sig: 'sig'.padEnd(128, '0'),
     }
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback(followsEvent)
-      }
-    )
+    mockFetchEvents.mockResolvedValueOnce([followsEvent])
 
     const adapter = createAdapter()
     const contacts = await adapter.getContacts()
@@ -106,21 +99,12 @@ describe('RealNostrAdapter.getContacts', () => {
     expect(contacts).toEqual([])
   })
 
-  it('resolves with empty contacts on timeout when no events received', async () => {
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], _callback: (e: NostrEvent) => void) => {
-        // no events delivered
-      }
-    )
+  it('returns empty contacts when no events returned', async () => {
+    mockFetchEvents.mockResolvedValueOnce([])
 
     const adapter = createAdapter()
-    const promise = adapter.getContacts()
-
-    await vi.advanceTimersByTimeAsync(5001)
-
-    const contacts = await promise
+    const contacts = await adapter.getContacts()
     expect(contacts).toEqual([])
-    expect(mockRelayPool.unsubscribe).toHaveBeenCalledTimes(1)
   })
 
   it('uses petname fallback to truncated pubkey when petname is empty', async () => {
@@ -134,11 +118,7 @@ describe('RealNostrAdapter.getContacts', () => {
       sig: 'sig'.padEnd(128, '0'),
     }
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback(followsEvent)
-      }
-    )
+    mockFetchEvents.mockResolvedValueOnce([followsEvent])
 
     const adapter = createAdapter()
     const contacts = await adapter.getContacts()
@@ -162,7 +142,7 @@ describe('RealNostrAdapter.addContact', () => {
       expect(result.data.pubkey).toBe(CONTACT_PUBKEY)
       expect(result.data.name).toBe(shortPubkey(CONTACT_PUBKEY))
     }
-    expect(mockRelayPool.publish).toHaveBeenCalledTimes(1)
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1)
   })
 
   it('adds contact with npub1 format', async () => {
@@ -210,9 +190,10 @@ describe('RealNostrAdapter.addContact', () => {
     const adapter = createAdapter()
     await adapter.addContact(CONTACT_PUBKEY)
 
-    expect(mockRelayPool.publish).toHaveBeenCalledTimes(1)
-    expect(mockRelayPool.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 3 })
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1)
+    expect(mockPublishEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 3 }),
+      expect.any(Array)
     )
   })
 })
@@ -234,7 +215,7 @@ describe('RealNostrAdapter.removeContact', () => {
     expect(result.success).toBe(true)
 
     // Publishes updated follow list
-    expect(mockRelayPool.publish).toHaveBeenCalledTimes(1)
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1)
   })
 
   it('returns error when removing non-existent contact', async () => {
@@ -248,14 +229,8 @@ describe('RealNostrAdapter.removeContact', () => {
   })
 
   it('contact is no longer returned after removal', async () => {
-    vi.useFakeTimers()
-
-    // Set up subscription to return empty for getContacts
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], _callback: (e: NostrEvent) => void) => {
-        // no events
-      }
-    )
+    // fetchEvents returns empty so getContacts falls back to internal state
+    mockFetchEvents.mockResolvedValue([])
 
     const adapter = createAdapter()
 
@@ -267,15 +242,11 @@ describe('RealNostrAdapter.removeContact', () => {
     const result = await adapter.removeContact(CONTACT_PUBKEY)
     expect(result.success).toBe(true)
 
-    // getContacts triggers relay subscription but falls back to cached state on timeout
-    const contactsPromise = adapter.getContacts()
-    await vi.advanceTimersByTimeAsync(5001)
-    const contacts = await contactsPromise
+    // getContacts fetches from relay (returns empty), so falls back to cached state
+    const contacts = await adapter.getContacts()
 
     // Only CONTACT_PUBKEY_2 should remain (from the internal state)
     expect(contacts.some(c => c.pubkey === CONTACT_PUBKEY)).toBe(false)
     expect(contacts.some(c => c.pubkey === CONTACT_PUBKEY_2)).toBe(true)
-
-    vi.useRealTimers()
   })
 })

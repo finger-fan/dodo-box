@@ -1,25 +1,20 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { NostrEvent, NostrFilter } from '@/lib/nostr/types'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { NostrEvent } from '@/lib/nostr/types'
 
-const { mockRelayPool } = vi.hoisted(() => {
-  const mockRelayPool = {
-    connect: vi.fn().mockResolvedValue(undefined),
-    publish: vi.fn().mockResolvedValue(true),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    closeAll: vi.fn(),
-    getConnectedRelays: vi.fn().mockReturnValue([]),
-  }
-  return { mockRelayPool }
-})
-
-vi.mock('@/lib/nostr/relay-client', () => ({
-  relayPool: mockRelayPool,
-  RelayClient: vi.fn(),
-  RelayPool: vi.fn(),
+vi.mock('@/lib/welshman/relay-manager', () => ({
+  connectToRelays: vi.fn(),
+  publishEvent: vi.fn().mockResolvedValue({ 'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' } }),
+  fetchEvents: vi.fn().mockResolvedValue([]),
+  subscribe: vi.fn().mockReturnValue({ abort: vi.fn(), signal: { aborted: false } }),
+  getConnectedRelays: vi.fn().mockReturnValue([]),
+  closeAllRelays: vi.fn(),
 }))
 
-vi.mock('@/lib/nostr/events', () => ({
+vi.mock('@/lib/welshman/crypto', () => ({
+  buildDirectMessageEvent: vi.fn(),
+  createGiftWrap: vi.fn().mockResolvedValue({ kind: 1059 }),
+  decryptGiftWrap: vi.fn().mockResolvedValue(null),
+  buildFollowListEvent: vi.fn(),
   buildProfileEvent: vi.fn(() => ({
     id: 'profile-evt-1',
     pubkey: 'a'.repeat(64),
@@ -29,14 +24,14 @@ vi.mock('@/lib/nostr/events', () => ({
     content: '{}',
     sig: 'sig'.padEnd(128, '0'),
   })),
-  buildFollowListEvent: vi.fn(),
-  buildDirectMessageEvent: vi.fn(),
-  createGiftWrap: vi.fn(),
-  decryptGiftWrap: vi.fn(),
+  buildVaultEvent: vi.fn(),
+  signEvent: vi.fn(),
 }))
 
 import { RealNostrAdapter } from '@/lib/nostr/real-adapter'
 import type { NostrSession } from '@/lib/nostr/types'
+import { connectToRelays, publishEvent, fetchEvents } from '@/lib/welshman/relay-manager'
+import { buildProfileEvent } from '@/lib/welshman/crypto'
 
 const TEST_PUBKEY = 'a'.repeat(64)
 const TEST_PRIVKEY = 'b'.repeat(64)
@@ -66,11 +61,6 @@ function createUnauthenticatedAdapter(): RealNostrAdapter {
 describe('RealNostrAdapter.getProfile', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('returns profile from relay', async () => {
@@ -92,11 +82,7 @@ describe('RealNostrAdapter.getProfile', () => {
       sig: 'sig'.padEnd(128, '0'),
     }
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback(profileEvent)
-      }
-    )
+    vi.mocked(fetchEvents).mockResolvedValueOnce([profileEvent as never])
 
     const adapter = createAdapter()
     const profile = await adapter.getProfile(OTHER_PUBKEY)
@@ -121,11 +107,7 @@ describe('RealNostrAdapter.getProfile', () => {
       sig: 'sig'.padEnd(128, '0'),
     }
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback(profileEvent)
-      }
-    )
+    vi.mocked(fetchEvents).mockResolvedValueOnce([profileEvent as never])
 
     const adapter = createAdapter()
     const profile = await adapter.getProfile(OTHER_PUBKEY)
@@ -134,21 +116,13 @@ describe('RealNostrAdapter.getProfile', () => {
     expect(profile!.displayName).toBe('Bob')
   })
 
-  it('returns null on timeout when no events received', async () => {
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], _callback: (e: NostrEvent) => void) => {
-        // no events delivered
-      }
-    )
+  it('returns null when no events received', async () => {
+    vi.mocked(fetchEvents).mockResolvedValueOnce([])
 
     const adapter = createAdapter()
-    const promise = adapter.getProfile(OTHER_PUBKEY)
+    const profile = await adapter.getProfile(OTHER_PUBKEY)
 
-    await vi.advanceTimersByTimeAsync(5001)
-
-    const profile = await promise
     expect(profile).toBeNull()
-    expect(mockRelayPool.unsubscribe).toHaveBeenCalledTimes(1)
   })
 
   it('returns null when event content is invalid JSON', async () => {
@@ -162,11 +136,7 @@ describe('RealNostrAdapter.getProfile', () => {
       sig: 'sig'.padEnd(128, '0'),
     }
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback(profileEvent)
-      }
-    )
+    vi.mocked(fetchEvents).mockResolvedValueOnce([profileEvent as never])
 
     const adapter = createAdapter()
     const profile = await adapter.getProfile(OTHER_PUBKEY)
@@ -189,10 +159,11 @@ describe('RealNostrAdapter.updateProfile', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(mockRelayPool.connect).toHaveBeenCalledTimes(1)
-    expect(mockRelayPool.publish).toHaveBeenCalledTimes(1)
-    expect(mockRelayPool.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 0 })
+    expect(connectToRelays).toHaveBeenCalledTimes(1)
+    expect(publishEvent).toHaveBeenCalledTimes(1)
+    expect(publishEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 0 }),
+      expect.any(Array)
     )
   })
 
@@ -206,11 +177,10 @@ describe('RealNostrAdapter.updateProfile', () => {
     if (!result.success) {
       expect(result.error).toBe('Not authenticated')
     }
-    expect(mockRelayPool.publish).not.toHaveBeenCalled()
+    expect(publishEvent).not.toHaveBeenCalled()
   })
 
   it('returns error when buildProfileEvent throws', async () => {
-    const { buildProfileEvent } = await import('@/lib/nostr/events')
     vi.mocked(buildProfileEvent).mockImplementationOnce(() => {
       throw new Error('signing failed')
     })

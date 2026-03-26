@@ -1,12 +1,15 @@
-// vault-sync.ts - Vault sync with Nostr relays
+// vault-sync.ts - Vault sync with Nostr relays (via welshman)
 
 import { KIND_VAULT, VAULT_EVENT_D_TAG } from './types'
 import type { VaultData, NostrFilter } from './types'
 import { encryptVault, decryptVault, createEmptyVaultData } from './vault-crypto'
-import { buildVaultEvent } from './events'
-import { relayPool } from './relay-client'
-
-const VAULT_SUBSCRIPTION_TIMEOUT_MS = 10000
+import {
+  connectToRelays,
+  fetchEvents,
+  publishEvent,
+  getConnectedRelays,
+} from '@/lib/welshman/relay-manager'
+import { buildVaultEvent } from '@/lib/welshman/crypto'
 
 export class VaultSync {
   private relayUrls: string[]
@@ -18,105 +21,67 @@ export class VaultSync {
   }
 
   async checkVaultExists(masterPublicKey: string): Promise<boolean> {
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    if (relayPool.getConnectedRelays().length === 0) {
-      return false
+    if (getConnectedRelays().length === 0) {
+      // Wait briefly for connections to establish
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      if (getConnectedRelays().length === 0) return false
     }
 
-    return new Promise((resolve) => {
-      const subId = `vault-check-${Date.now()}`
-      const filters: NostrFilter[] = [
-        {
-          kinds: [KIND_VAULT],
-          authors: [masterPublicKey],
-          '#d': [VAULT_EVENT_D_TAG],
-          limit: 1,
-        },
-      ]
+    const filters: NostrFilter[] = [
+      {
+        kinds: [KIND_VAULT],
+        authors: [masterPublicKey],
+        '#d': [VAULT_EVENT_D_TAG],
+        limit: 1,
+      },
+    ]
 
-      let found = false
-      const timeout = setTimeout(() => {
-        relayPool.unsubscribe(subId)
-        resolve(found)
-      }, VAULT_SUBSCRIPTION_TIMEOUT_MS)
-
-      relayPool.subscribe(subId, filters, () => {
-        found = true
-        clearTimeout(timeout)
-        relayPool.unsubscribe(subId)
-        resolve(true)
-      }, () => {
-        // onEose: relay finished sending stored events
-        if (!found) {
-          clearTimeout(timeout)
-          relayPool.unsubscribe(subId)
-          resolve(false)
-        }
-      })
-    })
+    const events = await fetchEvents(filters, this.relayUrls)
+    return events.length > 0
   }
 
   async fetchVault(
     masterPublicKey: string,
     masterPrivateKey: string
   ): Promise<VaultData | null> {
-    await relayPool.connect(this.relayUrls)
+    connectToRelays(this.relayUrls)
 
-    if (relayPool.getConnectedRelays().length === 0) {
-      return null
+    if (getConnectedRelays().length === 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      if (getConnectedRelays().length === 0) return null
     }
 
-    return new Promise((resolve) => {
-      const subId = `vault-fetch-${Date.now()}`
-      const filters: NostrFilter[] = [
-        {
-          kinds: [KIND_VAULT],
-          authors: [masterPublicKey],
-          '#d': [VAULT_EVENT_D_TAG],
-          limit: 1,
-        },
-      ]
+    const filters: NostrFilter[] = [
+      {
+        kinds: [KIND_VAULT],
+        authors: [masterPublicKey],
+        '#d': [VAULT_EVENT_D_TAG],
+        limit: 1,
+      },
+    ]
 
-      let latestEvent: { created_at: number; content: string } | null = null
-      let resolved = false
+    const events = await fetchEvents(filters, this.relayUrls)
+    if (events.length === 0) return null
 
-      const resolveWithLatest = async () => {
-        if (resolved) return
-        resolved = true
-        relayPool.unsubscribe(subId)
-        if (!latestEvent) {
-          resolve(null)
-          return
-        }
-        try {
-          const data = await decryptVault(masterPrivateKey, latestEvent.content)
-          resolve(data)
-        } catch {
-          resolve(null)
-        }
-      }
+    // Use the most recent event
+    const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0]
 
-      const timeout = setTimeout(resolveWithLatest, VAULT_SUBSCRIPTION_TIMEOUT_MS)
-
-      relayPool.subscribe(subId, filters, (event) => {
-        if (!latestEvent || event.created_at > latestEvent.created_at) {
-          latestEvent = event
-        }
-      }, () => {
-        // onEose: relay finished, process immediately
-        clearTimeout(timeout)
-        resolveWithLatest()
-      })
-    })
+    try {
+      return await decryptVault(masterPrivateKey, latestEvent.content)
+    } catch {
+      return null
+    }
   }
 
   async publishVault(masterPrivateKey: string, vaultData: VaultData): Promise<void> {
     const encryptedContent = await encryptVault(masterPrivateKey, vaultData)
     const event = buildVaultEvent(encryptedContent, masterPrivateKey)
-    await relayPool.connect(this.relayUrls)
-    const accepted = await relayPool.publish(event)
-    if (!accepted) {
+    connectToRelays(this.relayUrls)
+    const results = await publishEvent(event, this.relayUrls)
+    const anyAccepted = Object.values(results).some(r => r.status === 'success')
+    if (!anyAccepted) {
       throw new Error('Vault publish failed: no relay accepted the event')
     }
   }

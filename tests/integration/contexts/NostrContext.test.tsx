@@ -14,16 +14,15 @@ vi.mock('@/lib/nostr/vault-sync', () => ({
   },
 }))
 
-// Mock relayPool for connection status checks
-vi.mock('@/lib/nostr/relay-client', () => ({
-  relayPool: {
-    getConnectedRelays: vi.fn(() => []),
-    connect: vi.fn(),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    publish: vi.fn(),
-    closeAll: vi.fn(),
-  },
+// Mock welshman relay-manager for connection status checks
+vi.mock('@/lib/welshman/relay-manager', () => ({
+  connectToRelays: vi.fn(),
+  publishEvent: vi.fn().mockResolvedValue({}),
+  fetchEvents: vi.fn().mockResolvedValue([]),
+  subscribe: vi.fn().mockReturnValue({ abort: vi.fn(), signal: { aborted: false } }),
+  getConnectedRelays: vi.fn().mockReturnValue([]),
+  closeAllRelays: vi.fn(),
+  getFailedRelays: vi.fn().mockReturnValue([]),
 }))
 
 // Mock createNostrAdapter to return a simple mock
