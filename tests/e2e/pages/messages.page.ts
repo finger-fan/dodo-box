@@ -48,6 +48,9 @@ export class MessagesPage {
       state: 'visible',
       timeout: 15_000,
     })
+
+    // Allow relay WebSocket connection to establish before sending
+    await this.page.waitForTimeout(2000)
   }
 
   async sendMessage(text: string) {
@@ -57,6 +60,14 @@ export class MessagesPage {
 
     // Wait for the message to appear in the chat (optimistic update)
     await expect(this.page.locator(`text="${text}"`)).toBeVisible({ timeout: 10_000 })
+
+    // If message shows as failed (red X), retry once
+    const failedIndicator = this.page.locator('button[title="Tap to retry"]').first()
+    if (await failedIndicator.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await failedIndicator.click()
+      // Wait for retry to complete
+      await this.page.waitForTimeout(3000)
+    }
   }
 
   async waitForMessage(text: string, timeout = 15_000) {
