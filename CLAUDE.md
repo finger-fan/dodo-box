@@ -112,3 +112,20 @@ Tailwind CSS v4 + `@tailwindcss/postcss`。暗色模式通过 class 策略（`ne
 - `GEMINI_API_KEY` - Gemini AI API 密钥（AI Studio 运行时注入）
 - `APP_URL` - 托管 URL（AI Studio 运行时注入）
 - `DISABLE_HMR` - 设为 `"true"` 可禁用热模块替换
+- `NEXT_PUBLIC_UPDATE_URL` - OTA 更新 manifest URL
+- `NEXT_PUBLIC_APP_VERSION` - 应用版本号（可选，默认从 package.json 读取）
+
+### OTA 更新
+
+使用 `@capgo/capacitor-updater` 实现 OTA 更新：
+
+- `lib/updater.ts` - 核心 OTA 逻辑（notifyAppReady、checkForUpdate、downloadAndApply）
+- `hooks/use-updater.ts` - React Hook，自动检查更新
+- `components/UpdateChecker.tsx` - 更新提示 UI
+- `scripts/cap-bundle.js` - 构建 OTA bundle（生成 bundle.zip + manifest.json）
+- `scripts/cap-deploy.sh` - 统一部署脚本（APK + OTA + 落地页）
+- `site/` - 落地页站点（APK 下载 + 版本历史）
+
+OTA 脚本：
+- `pnpm cap:bundle [--base-url <url>] [--notes "release notes"]` - 构建 OTA bundle
+- `pnpm cap:deploy <user@host:/path> [--apk <path>] [--notes "notes"]` - 部署到服务器

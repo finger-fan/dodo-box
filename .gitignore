@@ -27,3 +27,9 @@ out/
 android/sign-key/
 *.keystore
 *.jks
+
+# Landing page site artifacts
+site/apks/*.apk
+site/updates/*/
+!site/updates/.gitkeep
+!site/apks/.gitkeep
