@@ -1,7 +1,7 @@
 // relay-manager.ts - Welshman Pool/Socket based relay management
 // Replaces lib/nostr/relay-client.ts
 
-import { publish, request } from '@welshman/net'
+import { publish, request, Tracker } from '@welshman/net'
 import type { Filter, TrustedEvent, SignedEvent } from '@welshman/util'
 import type { PublishResultsByRelay } from '@welshman/net'
 import { getPool, getTracker, getRepository } from './engine'
@@ -57,12 +57,13 @@ export async function fetchEvents(
 ): Promise<TrustedEvent[]> {
   connectToRelays(relayUrls)
 
-  const tracker = getTracker()
-
+  // Use a fresh Tracker per fetch to avoid cross-request dedup.
+  // React StrictMode re-runs effects, and a shared Tracker would mark events
+  // from the first (unmounted) run as "seen", causing the second run to miss them.
   return request({
     filters,
     relays: [...relayUrls],
-    tracker,
+    tracker: new Tracker(),
     autoClose: true,
     onEvent: options?.onEvent,
     onEose: options?.onEose,

@@ -28,7 +28,15 @@ export function useMessages(contactPubkey: string) {
     let mounted = true
 
     adapter.getMessages(contactPubkey).then((msgs) => {
-      if (mounted) setMessages(msgs)
+      if (!mounted) return
+      // Merge with existing messages (subscription may have already added some
+      // via the shared Tracker, so using the value form would overwrite them)
+      setMessages(prev => {
+        if (prev.length === 0) return msgs
+        const existingIds = new Set(prev.map(m => m.id))
+        const newMsgs = msgs.filter(m => !existingIds.has(m.id))
+        return newMsgs.length > 0 ? [...prev, ...newMsgs].sort(sortMessages) : prev
+      })
     })
 
     const unsubscribe = adapter.subscribeToMessages(contactPubkey, (msg) => {

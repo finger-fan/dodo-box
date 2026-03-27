@@ -174,11 +174,13 @@ export class RealNostrAdapter implements INostrAdapter {
   ): () => void {
     if (!this.session.currentPubkey || !this.privkey) return () => {}
 
+    // No `since` filter: NIP-59 gift wraps randomize created_at up to ~28h
+    // into the past (welshman now(5)), so a since=now filter would miss them.
+    // Dedup is handled by welshman's Tracker singleton.
     const filters: NostrFilter[] = [
       {
         kinds: [KIND_DM_WRAP],
         '#p': [this.session.currentPubkey],
-        since: Math.floor(Date.now() / 1000),
       },
     ]
 
