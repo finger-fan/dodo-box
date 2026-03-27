@@ -1,42 +1,48 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { VaultData, NostrEvent, NostrFilter } from '@/lib/nostr/types'
+import type { VaultData, NostrEvent } from '@/lib/nostr/types'
 import { KIND_VAULT, VAULT_EVENT_D_TAG } from '@/lib/nostr/types'
 
 // --- Mocks (hoisted so vi.mock factories can reference them) ---
 
 const {
-  mockRelayPool,
+  mockConnectToRelays,
+  mockFetchEvents,
+  mockPublishEvent,
+  mockGetConnectedRelays,
+  mockBuildVaultEvent,
   mockEncryptVault,
   mockDecryptVault,
   mockCreateEmptyVaultData,
-  mockBuildVaultEvent,
 } = vi.hoisted(() => ({
-  mockRelayPool: {
-    connect: vi.fn().mockResolvedValue(undefined),
-    getConnectedRelays: vi.fn().mockReturnValue(['wss://relay.test']),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    publish: vi.fn().mockResolvedValue(true),
-  },
+  mockConnectToRelays: vi.fn(),
+  mockFetchEvents: vi.fn().mockResolvedValue([]),
+  mockPublishEvent: vi.fn().mockResolvedValue({
+    'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+  }),
+  mockGetConnectedRelays: vi.fn().mockReturnValue(['wss://relay.test']),
+  mockBuildVaultEvent: vi.fn(),
   mockEncryptVault: vi.fn().mockResolvedValue('encrypted-vault-content'),
   mockDecryptVault: vi.fn(),
   mockCreateEmptyVaultData: vi.fn(),
-  mockBuildVaultEvent: vi.fn(),
 }))
 
-vi.mock('@/lib/nostr/relay-client', () => ({
-  relayPool: mockRelayPool,
+vi.mock('@/lib/welshman/relay-manager', () => ({
+  connectToRelays: mockConnectToRelays,
+  fetchEvents: mockFetchEvents,
+  publishEvent: mockPublishEvent,
+  getConnectedRelays: mockGetConnectedRelays,
+  closeAllRelays: vi.fn(),
+}))
+
+vi.mock('@/lib/welshman/crypto', () => ({
+  buildVaultEvent: (...args: unknown[]) => mockBuildVaultEvent(...args),
 }))
 
 vi.mock('@/lib/nostr/vault-crypto', () => ({
   encryptVault: (...args: unknown[]) => mockEncryptVault(...args),
   decryptVault: (...args: unknown[]) => mockDecryptVault(...args),
   createEmptyVaultData: () => mockCreateEmptyVaultData(),
-}))
-
-vi.mock('@/lib/nostr/events', () => ({
-  buildVaultEvent: (...args: unknown[]) => mockBuildVaultEvent(...args),
 }))
 
 import { VaultSync } from '@/lib/nostr/vault-sync'
@@ -69,9 +75,11 @@ describe('VaultSync', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockRelayPool.getConnectedRelays.mockReturnValue(['wss://relay.test'])
-    mockRelayPool.connect.mockResolvedValue(undefined)
-    mockRelayPool.publish.mockResolvedValue(true)
+    mockGetConnectedRelays.mockReturnValue(['wss://relay.test'])
+    mockConnectToRelays.mockReturnValue(undefined)
+    mockPublishEvent.mockResolvedValue({
+      'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+    })
     vaultSync = new VaultSync(['wss://relay.test'])
   })
 
@@ -81,19 +89,13 @@ describe('VaultSync', () => {
 
   describe('checkVaultExists', () => {
     it('returns true when vault event found', async () => {
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], onEvent: (event: NostrEvent) => void) => {
-          // Simulate relay sending a vault event
-          onEvent(makeVaultEvent())
-        }
-      )
+      mockFetchEvents.mockResolvedValue([makeVaultEvent()])
 
       const result = await vaultSync.checkVaultExists(TEST_PUBKEY)
 
       expect(result).toBe(true)
-      expect(mockRelayPool.connect).toHaveBeenCalledWith(['wss://relay.test'])
-      expect(mockRelayPool.subscribe).toHaveBeenCalledWith(
-        expect.stringContaining('vault-check-'),
+      expect(mockConnectToRelays).toHaveBeenCalledWith(['wss://relay.test'])
+      expect(mockFetchEvents).toHaveBeenCalledWith(
         [
           {
             kinds: [KIND_VAULT],
@@ -102,49 +104,31 @@ describe('VaultSync', () => {
             limit: 1,
           },
         ],
-        expect.any(Function),
-        expect.any(Function),
+        ['wss://relay.test'],
       )
-      expect(mockRelayPool.unsubscribe).toHaveBeenCalled()
     })
 
-    it('returns false when no vault event found (EOSE)', async () => {
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], _onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          // Simulate relay finishing without sending events
-          onEose()
-        }
-      )
+    it('returns false when no vault event found', async () => {
+      mockFetchEvents.mockResolvedValue([])
 
       const result = await vaultSync.checkVaultExists(TEST_PUBKEY)
 
       expect(result).toBe(false)
-      expect(mockRelayPool.unsubscribe).toHaveBeenCalled()
     })
 
     it('returns false when no relays are connected', async () => {
-      mockRelayPool.getConnectedRelays.mockReturnValue([])
-
-      const result = await vaultSync.checkVaultExists(TEST_PUBKEY)
-
-      expect(result).toBe(false)
-      expect(mockRelayPool.subscribe).not.toHaveBeenCalled()
-    })
-
-    it('returns false on timeout when no events received', async () => {
       vi.useFakeTimers()
-
-      // subscribe but never call onEvent or onEose
-      mockRelayPool.subscribe.mockImplementation(() => {})
+      mockGetConnectedRelays.mockReturnValue([])
 
       const resultP = vaultSync.checkVaultExists(TEST_PUBKEY)
 
-      await vi.advanceTimersByTimeAsync(10001)
+      // Advance past the 2-second wait for reconnection check
+      await vi.advanceTimersByTimeAsync(2000)
 
       const result = await resultP
 
       expect(result).toBe(false)
-      expect(mockRelayPool.unsubscribe).toHaveBeenCalled()
+      expect(mockFetchEvents).not.toHaveBeenCalled()
 
       vi.useRealTimers()
     })
@@ -155,19 +139,13 @@ describe('VaultSync', () => {
       const vaultData = makeVaultData({ identities: [] })
       const event = makeVaultEvent({ content: 'encrypted-content', created_at: 2000 })
 
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          onEvent(event)
-          onEose()
-        }
-      )
+      mockFetchEvents.mockResolvedValue([event])
       mockDecryptVault.mockResolvedValue(vaultData)
 
       const result = await vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
 
       expect(result).toEqual(vaultData)
       expect(mockDecryptVault).toHaveBeenCalledWith(TEST_PRIVKEY, 'encrypted-content')
-      expect(mockRelayPool.unsubscribe).toHaveBeenCalled()
     })
 
     it('returns the latest event when multiple events received', async () => {
@@ -175,13 +153,7 @@ describe('VaultSync', () => {
       const newEvent = makeVaultEvent({ content: 'new-content', created_at: 2000 })
       const vaultData = makeVaultData()
 
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          onEvent(oldEvent)
-          onEvent(newEvent)
-          onEose()
-        }
-      )
+      mockFetchEvents.mockResolvedValue([oldEvent, newEvent])
       mockDecryptVault.mockResolvedValue(vaultData)
 
       await vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
@@ -189,12 +161,8 @@ describe('VaultSync', () => {
       expect(mockDecryptVault).toHaveBeenCalledWith(TEST_PRIVKEY, 'new-content')
     })
 
-    it('returns null when no events found (EOSE)', async () => {
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], _onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          onEose()
-        }
-      )
+    it('returns null when no events found', async () => {
+      mockFetchEvents.mockResolvedValue([])
 
       const result = await vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
 
@@ -202,40 +170,26 @@ describe('VaultSync', () => {
       expect(mockDecryptVault).not.toHaveBeenCalled()
     })
 
-    it('returns null on timeout when no events received', async () => {
+    it('returns null when no relays are connected', async () => {
       vi.useFakeTimers()
-
-      mockRelayPool.subscribe.mockImplementation(() => {})
+      mockGetConnectedRelays.mockReturnValue([])
 
       const resultP = vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
 
-      await vi.advanceTimersByTimeAsync(10001)
+      await vi.advanceTimersByTimeAsync(2000)
 
       const result = await resultP
 
       expect(result).toBeNull()
-      expect(mockRelayPool.unsubscribe).toHaveBeenCalled()
+      expect(mockFetchEvents).not.toHaveBeenCalled()
 
       vi.useRealTimers()
-    })
-
-    it('returns null when no relays are connected', async () => {
-      mockRelayPool.getConnectedRelays.mockReturnValue([])
-
-      const result = await vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
-
-      expect(result).toBeNull()
     })
 
     it('returns null when decryption fails', async () => {
       const event = makeVaultEvent({ content: 'bad-encrypted', created_at: 2000 })
 
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          onEvent(event)
-          onEose()
-        }
-      )
+      mockFetchEvents.mockResolvedValue([event])
       mockDecryptVault.mockRejectedValue(new Error('decryption failed'))
 
       const result = await vaultSync.fetchVault(TEST_PUBKEY, TEST_PRIVKEY)
@@ -251,14 +205,16 @@ describe('VaultSync', () => {
 
       mockEncryptVault.mockResolvedValue('encrypted-data')
       mockBuildVaultEvent.mockReturnValue(fakeEvent)
-      mockRelayPool.publish.mockResolvedValue(true)
+      mockPublishEvent.mockResolvedValue({
+        'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+      })
 
       await expect(vaultSync.publishVault(TEST_PRIVKEY, vaultData)).resolves.toBeUndefined()
 
       expect(mockEncryptVault).toHaveBeenCalledWith(TEST_PRIVKEY, vaultData)
       expect(mockBuildVaultEvent).toHaveBeenCalledWith('encrypted-data', TEST_PRIVKEY)
-      expect(mockRelayPool.connect).toHaveBeenCalledWith(['wss://relay.test'])
-      expect(mockRelayPool.publish).toHaveBeenCalledWith(fakeEvent)
+      expect(mockConnectToRelays).toHaveBeenCalledWith(['wss://relay.test'])
+      expect(mockPublishEvent).toHaveBeenCalledWith(fakeEvent, ['wss://relay.test'])
     })
 
     it('throws error when relay rejects the event', async () => {
@@ -267,7 +223,9 @@ describe('VaultSync', () => {
 
       mockEncryptVault.mockResolvedValue('encrypted-data')
       mockBuildVaultEvent.mockReturnValue(fakeEvent)
-      mockRelayPool.publish.mockResolvedValue(false)
+      mockPublishEvent.mockResolvedValue({
+        'wss://relay.test': { status: 'failure', detail: 'rejected', relay: 'wss://relay.test' },
+      })
 
       await expect(vaultSync.publishVault(TEST_PRIVKEY, vaultData)).rejects.toThrow(
         'Vault publish failed: no relay accepted the event'
@@ -283,14 +241,16 @@ describe('VaultSync', () => {
       mockCreateEmptyVaultData.mockReturnValue(emptyVault)
       mockEncryptVault.mockResolvedValue('encrypted-empty')
       mockBuildVaultEvent.mockReturnValue(fakeEvent)
-      mockRelayPool.publish.mockResolvedValue(true)
+      mockPublishEvent.mockResolvedValue({
+        'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+      })
 
       const result = await vaultSync.createVault(TEST_PRIVKEY)
 
       expect(result).toEqual(emptyVault)
       expect(mockCreateEmptyVaultData).toHaveBeenCalled()
       expect(mockEncryptVault).toHaveBeenCalledWith(TEST_PRIVKEY, emptyVault)
-      expect(mockRelayPool.publish).toHaveBeenCalledWith(fakeEvent)
+      expect(mockPublishEvent).toHaveBeenCalledWith(fakeEvent, ['wss://relay.test'])
     })
   })
 
@@ -301,7 +261,9 @@ describe('VaultSync', () => {
 
       mockEncryptVault.mockResolvedValue('encrypted-updated')
       mockBuildVaultEvent.mockReturnValue(fakeEvent)
-      mockRelayPool.publish.mockResolvedValue(true)
+      mockPublishEvent.mockResolvedValue({
+        'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+      })
 
       await expect(vaultSync.updateVault(TEST_PRIVKEY, vaultData)).resolves.toBeUndefined()
 
@@ -312,7 +274,7 @@ describe('VaultSync', () => {
       expect(encryptCall[1].version).toBe(1)
       expect(encryptCall[1].identities).toEqual([])
 
-      expect(mockRelayPool.publish).toHaveBeenCalledWith(fakeEvent)
+      expect(mockPublishEvent).toHaveBeenCalledWith(fakeEvent, ['wss://relay.test'])
     })
 
     it('does not mutate the original vault data', async () => {
@@ -321,7 +283,9 @@ describe('VaultSync', () => {
 
       mockEncryptVault.mockResolvedValue('encrypted-updated')
       mockBuildVaultEvent.mockReturnValue(fakeEvent)
-      mockRelayPool.publish.mockResolvedValue(true)
+      mockPublishEvent.mockResolvedValue({
+        'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+      })
 
       await vaultSync.updateVault(TEST_PRIVKEY, vaultData)
 
@@ -333,15 +297,11 @@ describe('VaultSync', () => {
     it('uses provided relay URLs', async () => {
       const customSync = new VaultSync(['wss://custom.relay'])
 
-      mockRelayPool.subscribe.mockImplementation(
-        (_subId: string, _filters: NostrFilter[], _onEvent: (event: NostrEvent) => void, onEose: () => void) => {
-          onEose()
-        }
-      )
+      mockFetchEvents.mockResolvedValue([])
 
       await customSync.checkVaultExists(TEST_PUBKEY)
 
-      expect(mockRelayPool.connect).toHaveBeenCalledWith(['wss://custom.relay'])
+      expect(mockConnectToRelays).toHaveBeenCalledWith(['wss://custom.relay'])
     })
   })
 })

@@ -1,18 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { NostrEvent, NostrFilter } from '@/lib/nostr/types'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { NostrEvent } from '@/lib/nostr/types'
 
 // vi.mock is hoisted — factories cannot reference outer variables.
 // Use vi.hoisted to create shared references.
-const { mockRelayPool, mockInnerEvent } = vi.hoisted(() => {
-  const mockRelayPool = {
-    connect: vi.fn().mockResolvedValue(undefined),
-    publish: vi.fn().mockResolvedValue(true),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    closeAll: vi.fn(),
-    getConnectedRelays: vi.fn().mockReturnValue([]),
-  }
-
+const { mockPublishResult, mockInnerEvent, mockFetchEvents, mockPublishEvent, mockDecryptGiftWrap, mockSubscribe } = vi.hoisted(() => {
   const mockInnerEvent = {
     id: 'inner-evt-1',
     pubkey: 'sender'.padEnd(64, '0'),
@@ -23,29 +14,40 @@ const { mockRelayPool, mockInnerEvent } = vi.hoisted(() => {
     sig: 'sig'.padEnd(128, '0'),
   }
 
-  return { mockRelayPool, mockInnerEvent }
+  const mockPublishResult = {
+    'wss://relay.test': { status: 'success', detail: '', relay: 'wss://relay.test' },
+  }
+
+  const mockFetchEvents = vi.fn().mockResolvedValue([])
+  const mockPublishEvent = vi.fn().mockResolvedValue(mockPublishResult)
+  const mockDecryptGiftWrap = vi.fn().mockResolvedValue(mockInnerEvent)
+  const mockSubscribe = vi.fn().mockReturnValue({ abort: vi.fn(), signal: { aborted: false } })
+
+  return { mockPublishResult, mockInnerEvent, mockFetchEvents, mockPublishEvent, mockDecryptGiftWrap, mockSubscribe }
 })
 
-vi.mock('@/lib/nostr/relay-client', () => ({
-  relayPool: mockRelayPool,
-  RelayClient: vi.fn(),
-  RelayPool: vi.fn(),
+vi.mock('@/lib/welshman/relay-manager', () => ({
+  connectToRelays: vi.fn(),
+  publishEvent: mockPublishEvent,
+  fetchEvents: mockFetchEvents,
+  subscribe: mockSubscribe,
+  getConnectedRelays: vi.fn().mockReturnValue([]),
+  closeAllRelays: vi.fn(),
 }))
 
-vi.mock('@/lib/nostr/events', () => ({
+vi.mock('@/lib/welshman/crypto', () => ({
   buildDirectMessageEvent: vi.fn(() => mockInnerEvent),
-  createGiftWrap: vi.fn((innerEvent: NostrEvent, _recipientPubkey: string) => ({
-    ...innerEvent,
-    id: `wrap-${innerEvent.id}-${Math.random().toString(36).slice(2, 8)}`,
-    kind: 1059,
-  })),
-  decryptGiftWrap: vi.fn((_event: NostrEvent, _privkey: string) => mockInnerEvent),
+  createGiftWrap: vi.fn().mockResolvedValue({ ...mockInnerEvent, kind: 1059, id: 'wrap-id' }),
+  decryptGiftWrap: mockDecryptGiftWrap,
+  buildFollowListEvent: vi.fn(),
+  buildProfileEvent: vi.fn(),
+  buildVaultEvent: vi.fn(),
+  signEvent: vi.fn(),
 }))
 
 // Import after mocks
 import { RealNostrAdapter } from '@/lib/nostr/real-adapter'
 import type { NostrSession } from '@/lib/nostr/types'
-import { decryptGiftWrap } from '@/lib/nostr/events'
 
 const TEST_PUBKEY = 'a'.repeat(64)
 const TEST_PRIVKEY = 'b'.repeat(64)
@@ -65,15 +67,15 @@ function createAdapter(): RealNostrAdapter {
 describe('RealNostrAdapter.sendMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockRelayPool.publish.mockResolvedValue(true)
+    mockPublishEvent.mockResolvedValue(mockPublishResult)
   })
 
   it('awaits publish (not fire-and-forget)', async () => {
     let publishResolved = false
-    mockRelayPool.publish.mockImplementation(async () => {
+    mockPublishEvent.mockImplementation(async () => {
       await new Promise((r) => setTimeout(r, 10))
       publishResolved = true
-      return true
+      return mockPublishResult
     })
 
     const adapter = createAdapter()
@@ -87,11 +89,11 @@ describe('RealNostrAdapter.sendMessage', () => {
     const adapter = createAdapter()
     await adapter.sendMessage(CONTACT_PUBKEY, 'hello')
 
-    expect(mockRelayPool.publish).toHaveBeenCalledTimes(2)
+    expect(mockPublishEvent).toHaveBeenCalledTimes(2)
   })
 
   it('returns error when publish fails with exception', async () => {
-    mockRelayPool.publish.mockRejectedValue(new Error('relay offline'))
+    mockPublishEvent.mockRejectedValue(new Error('relay offline'))
 
     const adapter = createAdapter()
     const result = await adapter.sendMessage(CONTACT_PUBKEY, 'will fail')
@@ -135,28 +137,15 @@ describe('RealNostrAdapter.sendMessage', () => {
 describe('RealNostrAdapter.getMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('resolves with single timeout (no double resolve)', async () => {
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], _callback: (e: NostrEvent) => void) => {
-        // No events — just let it timeout
-      }
-    )
+  it('returns empty array when no events are fetched', async () => {
+    mockFetchEvents.mockResolvedValue([])
 
     const adapter = createAdapter()
-    const promise = adapter.getMessages(CONTACT_PUBKEY)
+    const messages = await adapter.getMessages(CONTACT_PUBKEY)
 
-    await vi.advanceTimersByTimeAsync(5001)
-
-    const messages = await promise
     expect(messages).toEqual([])
-    expect(mockRelayPool.unsubscribe).toHaveBeenCalledTimes(1)
   })
 
   it('collects and returns decrypted messages sorted by timestamp', async () => {
@@ -172,25 +161,20 @@ describe('RealNostrAdapter.getMessages', () => {
       tags: [['p', CONTACT_PUBKEY]],
     }
 
+    mockFetchEvents.mockResolvedValue([
+      { ...mockInnerEvent, id: 'wrap-1' },
+      { ...mockInnerEvent, id: 'wrap-2' },
+    ])
+
     let callCount = 0
-    vi.mocked(decryptGiftWrap).mockImplementation(() => {
+    mockDecryptGiftWrap.mockImplementation(async () => {
       callCount++
       return callCount === 1 ? contactEvent : myEvent
     })
 
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback({ ...mockInnerEvent, id: 'wrap-1' } as NostrEvent)
-        callback({ ...mockInnerEvent, id: 'wrap-2' } as NostrEvent)
-      }
-    )
-
     const adapter = createAdapter()
-    const promise = adapter.getMessages(CONTACT_PUBKEY)
+    const messages = await adapter.getMessages(CONTACT_PUBKEY)
 
-    await vi.advanceTimersByTimeAsync(5001)
-
-    const messages = await promise
     expect(messages.length).toBe(2)
     expect(messages[0].sender).toBe('them')
     expect(messages[1].sender).toBe('me')
@@ -204,19 +188,14 @@ describe('RealNostrAdapter.getMessages', () => {
       tags: [['p', 'e'.repeat(64)]],
     }
 
-    vi.mocked(decryptGiftWrap).mockReturnValue(unrelatedEvent)
-
-    mockRelayPool.subscribe.mockImplementation(
-      (_subId: string, _filters: NostrFilter[], callback: (e: NostrEvent) => void) => {
-        callback({ ...mockInnerEvent, id: 'unrelated' } as NostrEvent)
-      }
-    )
+    mockFetchEvents.mockResolvedValue([
+      { ...mockInnerEvent, id: 'unrelated' },
+    ])
+    mockDecryptGiftWrap.mockResolvedValue(unrelatedEvent)
 
     const adapter = createAdapter()
-    const promise = adapter.getMessages(CONTACT_PUBKEY)
-    await vi.advanceTimersByTimeAsync(5001)
+    const messages = await adapter.getMessages(CONTACT_PUBKEY)
 
-    const messages = await promise
     expect(messages.length).toBe(0)
   })
 

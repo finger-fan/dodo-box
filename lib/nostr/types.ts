@@ -79,16 +79,15 @@ export type NostrResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-export interface NostrFilter {
+export type NostrFilter = {
   ids?: string[]
   authors?: string[]
   kinds?: number[]
   since?: number
   until?: number
   limit?: number
-  '#p'?: string[]
-  '#d'?: string[]
-  '#e'?: string[]
+  search?: string
+  [key: `#${string}`]: string[]
 }
 
 export interface NostrEvent {

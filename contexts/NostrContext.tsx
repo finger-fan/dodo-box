@@ -19,7 +19,7 @@ import {
   removeIdentityFromVault,
 } from '@/lib/nostr/vault-crypto'
 import { vaultSync } from '@/lib/nostr/vault-sync'
-import { relayPool } from '@/lib/nostr/relay-client'
+import { getConnectedRelays } from '@/lib/welshman/relay-manager'
 import { createNostrAdapter } from '@/lib/nostr'
 import type {
   NostrSession,
@@ -157,7 +157,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       )
 
       if (!vaultData) {
-        const connected = relayPool.getConnectedRelays().length
+        const connected = getConnectedRelays().length
         const error = connected === 0
           ? 'No relay connection. Check your network and try again.'
           : 'Account not found'
