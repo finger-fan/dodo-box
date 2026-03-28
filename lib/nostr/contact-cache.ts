@@ -2,10 +2,22 @@
 // Controlled by a UI toggle (disabled by default for privacy).
 
 import type { NostrContact, NostrChat } from './types'
+import { shortPubkey } from '@/lib/utils'
 
 const CONTACTS_CACHE_KEY = 'dodobox_contacts_cache'
 const CHATS_CACHE_KEY = 'dodobox_chats_cache'
 const CACHE_ENABLED_KEY = 'dodobox_contact_cache'
+
+// Same control-char / shortPubkey patterns as real-adapter.ts
+const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\uFEFF]/g
+const SHORT_PUBKEY_RE = /^npub1[a-z0-9]{0,10}\.{2,3}[a-z0-9]{0,6}$/
+
+function sanitizeCachedName(name: unknown, pubkey: string): string {
+  if (typeof name !== 'string' || name.trim().length === 0) return shortPubkey(pubkey)
+  const cleaned = (name as string).replace(CONTROL_CHARS_RE, '').trim()
+  if (cleaned.length === 0 || SHORT_PUBKEY_RE.test(cleaned)) return shortPubkey(pubkey)
+  return cleaned.slice(0, 50)
+}
 
 export function isContactCacheEnabled(): boolean {
   if (typeof window === 'undefined') return false
@@ -64,7 +76,11 @@ function saveCache<T>(key: string, pubkey: string, data: readonly T[]): void {
 }
 
 export function loadCachedContacts(pubkey: string): NostrContact[] {
-  return loadCache<NostrContact>(CONTACTS_CACHE_KEY, pubkey)
+  const contacts = loadCache<NostrContact>(CONTACTS_CACHE_KEY, pubkey)
+  return contacts.map(c => ({
+    ...c,
+    name: sanitizeCachedName(c.name, c.pubkey),
+  }))
 }
 
 export function saveCachedContacts(pubkey: string, contacts: readonly NostrContact[]): void {

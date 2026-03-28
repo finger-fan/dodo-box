@@ -3,6 +3,14 @@ apply plugin: 'com.android.application'
 android {
     namespace = "box.dodo.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            storeFile file('../../android/dodo-box-release.keystore')
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: '1@fran7Y'
+            keyAlias 'dodo-box'
+            keyPassword System.getenv('KEY_PASSWORD') ?: '1@fran7Y'
+        }
+    }
     defaultConfig {
         applicationId "box.dodo.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,8 +26,15 @@ android {
     }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            def date = new Date().format('yyyyMMdd')
+            outputFileName = "dodo-box-${variant.versionName}-${date}.apk"
         }
     }
 }

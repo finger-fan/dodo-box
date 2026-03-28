@@ -35,6 +35,32 @@ import {
 import type { TrustedEvent, SignedEvent } from '@welshman/util'
 
 const MESSAGE_FETCH_LIMIT = 100
+const MAX_PETNAME_LENGTH = 50
+
+// Regex: control chars (U+0000-U+001F, U+007F-U+009F), zero-width chars
+const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\uFEFF]/g
+// Matches shortPubkey output: "npub1..." or hex prefix with ellipsis
+const SHORT_PUBKEY_RE = /^npub1[a-z0-9]{0,10}\.{2,3}[a-z0-9]{0,6}$/
+const HEX_SHORT_RE = /^[0-9a-f]{4,10}\.{2,3}$/
+
+/**
+ * Sanitize a petname read from a relay tag or cache.
+ * Returns empty string for invalid/garbled/display-only values.
+ */
+function sanitizePetname(raw: unknown): string {
+  if (typeof raw !== 'string') return ''
+  const trimmed = raw.replace(CONTROL_CHARS_RE, '').trim()
+  if (trimmed.length === 0) return ''
+  if (SHORT_PUBKEY_RE.test(trimmed) || HEX_SHORT_RE.test(trimmed)) return ''
+  return trimmed.slice(0, MAX_PETNAME_LENGTH)
+}
+
+/**
+ * Check if a contact name is a real user-set nickname (not a shortPubkey fallback).
+ */
+function isRealNickname(name: string, pubkey: string): boolean {
+  return name !== '' && name !== shortPubkey(pubkey)
+}
 
 export class RealNostrAdapter implements INostrAdapter {
   private session: NostrSession
@@ -227,7 +253,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
         const contactTags = event.tags
           .filter(t => t[0] === 'p' && t[1])
-          .map(t => ({ pubkey: t[1], petname: t[3] || '' }))
+          .map(t => ({ pubkey: t[1], petname: sanitizePetname(t[3]) }))
 
         this.contacts = contactTags.map((ct, i) => ({
           id: `contact-${i}`,
@@ -309,10 +335,10 @@ export class RealNostrAdapter implements INostrAdapter {
       saveCachedContacts(this.session.currentPubkey, this.contacts)
     }
 
-    // Publish new kind 3 follows list with petnames
+    // Publish new kind 3 follows list with petnames (only real nicknames, not shortPubkey)
     if (this.privkey) {
       const event = buildFollowListEvent(
-        this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
+        this.contacts.map(c => ({ pubkey: c.pubkey, petname: isRealNickname(c.name, c.pubkey) ? c.name : '' })),
         this.privkey
       )
       await publishEvent(event, this.relayUrls)
@@ -335,7 +361,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
     if (this.privkey) {
       const event = buildFollowListEvent(
-        this.contacts.map(c => ({ pubkey: c.pubkey, petname: c.name })),
+        this.contacts.map(c => ({ pubkey: c.pubkey, petname: isRealNickname(c.name, c.pubkey) ? c.name : '' })),
         this.privkey
       )
       await publishEvent(event, this.relayUrls)

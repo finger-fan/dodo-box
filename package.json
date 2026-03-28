@@ -34,7 +34,8 @@
     "cap:apk:release": "pnpm cap:build && cd android && ./gradlew assembleRelease",
     "cap:bundle": "node scripts/cap-bundle.js",
     "cap:upload": "bash scripts/cap-upload.sh",
-    "cap:open": "npx cap open android"
+    "cap:open": "npx cap open android",
+    "cap:deploy": "bash scripts/cap-deploy.sh"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
