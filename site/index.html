@@ -87,22 +87,43 @@
         <h2>Download</h2>
         <p>Get the latest version for Android</p>
       </div>
-      <div class="download-card">
-        <span class="version-badge" id="version-badge">v0.8.8</span>
-        <h3>dodo-box Android</h3>
-        <p class="download-meta" id="download-meta">Version 0.8.8 • Released 2026-03-27</p>
-        <div class="download-notes" id="download-notes">
-          <strong>Release Notes</strong>
-          <span id="release-notes-text">Initial public release</span>
+      <div class="download-group">
+        <!-- Stable Release -->
+        <div class="download-card" id="stable-download">
+          <span class="version-badge" id="stable-version-badge">-</span>
+          <h3>Stable Release</h3>
+          <p class="download-meta" id="stable-download-meta">Loading...</p>
+          <div class="download-notes" id="stable-download-notes">
+            <strong>Release Notes</strong>
+            <span id="stable-release-notes-text">-</span>
+          </div>
+          <a href="#" class="btn btn-primary" id="stable-download-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download APK
+          </a>
         </div>
-        <a href="apks/dodo-box-0.8.8.apk" class="btn btn-primary" id="download-link">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Download APK
-        </a>
+        <!-- Beta Release -->
+        <div class="download-card download-card-beta" id="beta-download">
+          <span class="version-badge version-badge-beta" id="beta-version-badge">-</span>
+          <h3>Beta Release</h3>
+          <p class="download-meta" id="beta-download-meta">Loading...</p>
+          <div class="download-notes" id="beta-download-notes">
+            <strong>Release Notes</strong>
+            <span id="beta-release-notes-text">-</span>
+          </div>
+          <a href="#" class="btn btn-secondary" id="beta-download-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Beta APK
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -114,7 +135,7 @@
         <h2>Version History</h2>
         <p>All releases and updates</p>
       </div>
-      <div class="versions-table-wrapper" id="versions-container">
+      <div id="versions-container">
         <p class="loading">Loading version history...</p>
       </div>
     </div>
@@ -147,64 +168,109 @@
 
         const data = await response.json();
         const releases = data.releases || [];
+        const stableReleases = releases.filter(function(r) { return r.channel === 'stable' });
+        const betaReleases = releases.filter(function(r) { return r.channel === 'beta' });
 
-        if (releases.length === 0) {
-          container.innerHTML = '<p class="error">No releases found</p>';
-          return;
-        }
+        // Update stable download section
+        updateDownloadCard('stable', stableReleases[0]);
+        // Update beta download section
+        updateDownloadCard('beta', betaReleases[0]);
 
-        // Update download section with latest
-        const latest = releases[0];
-        document.getElementById('version-badge').textContent = `v${latest.version}`;
-        document.getElementById('download-meta').textContent =
-          `Version ${latest.version} • Released ${formatDate(latest.date)} • Build ${latest.versionCode}`;
-        document.getElementById('release-notes-text').textContent = latest.notes || 'No release notes';
-        document.getElementById('download-link').href = latest.apk;
-
-        // Build versions table
-        const table = document.createElement('table');
-        table.className = 'versions-table';
-        table.innerHTML = `
-          <thead>
-            <tr>
-              <th>Version</th>
-              <th>Date</th>
-              <th>Build</th>
-              <th>Notes</th>
-              <th>Download</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${releases.map((release, index) => `
-              <tr>
-                <td>
-                  <div class="version-cell">
-                    <span>v${release.version}</span>
-                    ${index === 0 ? '<span class="version-badge-small">latest</span>' : ''}
-                  </div>
-                </td>
-                <td>${formatDate(release.date)}</td>
-                <td>${release.versionCode}</td>
-                <td>${truncate(release.notes, 50)}</td>
-                <td>
-                  <a href="${release.apk}" class="link-btn">APK</a>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
-
+        // Build version history
         container.innerHTML = '';
-        container.appendChild(table);
+
+        var stableSection = buildVersionSection('Stable Versions', stableReleases, 'stable');
+        container.appendChild(stableSection);
+
+        var betaSection = buildVersionSection('Beta Versions', betaReleases, 'beta');
+        container.appendChild(betaSection);
       } catch (error) {
-        container.innerHTML = `<p class="error">Error loading versions: ${error.message}</p>`;
+        container.innerHTML = '<p class="error">Error loading versions: ' + error.message + '</p>';
       }
+    }
+
+    // Update a download card with release info
+    function updateDownloadCard(channel, release) {
+      var badge = document.getElementById(channel + '-version-badge');
+      var meta = document.getElementById(channel + '-download-meta');
+      var notes = document.getElementById(channel + '-release-notes-text');
+      var link = document.getElementById(channel + '-download-link');
+
+      if (!release) {
+        badge.textContent = '-';
+        meta.textContent = 'No releases available';
+        notes.textContent = '-';
+        link.style.display = 'none';
+        return;
+      }
+
+      badge.textContent = 'v' + release.version;
+      meta.textContent = 'Version ' + release.version + ' \u2022 Released ' + formatDate(release.date) + ' \u2022 Build ' + release.versionCode;
+      notes.textContent = release.notes || 'No release notes';
+      link.href = release.apk;
+      link.style.display = '';
+    }
+
+    // Build a version history section with title and table
+    function buildVersionSection(title, releases, channel) {
+      var section = document.createElement('div');
+      section.className = 'versions-section';
+      section.setAttribute('data-channel', channel);
+
+      var heading = document.createElement('h3');
+      heading.className = 'versions-section-title';
+      heading.textContent = title;
+      section.appendChild(heading);
+
+      if (releases.length === 0) {
+        var empty = document.createElement('p');
+        empty.className = 'versions-empty';
+        empty.textContent = 'No ' + channel + ' releases found';
+        section.appendChild(empty);
+        return section;
+      }
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'versions-table-wrapper';
+
+      var table = document.createElement('table');
+      table.className = 'versions-table';
+      table.innerHTML =
+        '<thead><tr>' +
+          '<th>Version</th>' +
+          '<th>Date</th>' +
+          '<th>Build</th>' +
+          '<th>Notes</th>' +
+          '<th>Download</th>' +
+        '</tr></thead>' +
+        '<tbody>' +
+          releases.map(function(release, index) {
+            return '<tr>' +
+              '<td>' +
+                '<div class="version-cell">' +
+                  '<span>v' + release.version + '</span>' +
+                  (index === 0 ? '<span class="version-badge-small">latest</span>' : '') +
+                '</div>' +
+              '</td>' +
+              '<td>' + formatDate(release.date) + '</td>' +
+              '<td>' + release.versionCode + '</td>' +
+              '<td>' + truncate(release.notes, 50) + '</td>' +
+              '<td>' +
+                '<a href="' + release.apk + '" class="link-btn">APK</a>' +
+              '</td>' +
+            '</tr>';
+          }).join('') +
+        '</tbody>';
+
+      wrapper.appendChild(table);
+      section.appendChild(wrapper);
+      return section;
     }
 
     // Format date nicely
     function formatDate(dateString) {
       if (!dateString) return '-';
-      const date = new Date(dateString);
+      var date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
       return date.toLocaleDateString('en-US', {
         year: 'numeric',

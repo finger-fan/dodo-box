@@ -25,6 +25,7 @@
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:site": "playwright test --config playwright.site.config.ts",
     "test:e2e:install": "playwright install chromium",
     "test:all": "pnpm test && pnpm test:e2e",
     "cap:export": "node scripts/cap-build-export.js",
