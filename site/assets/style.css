@@ -211,13 +211,23 @@ section {
   text-align: center;
 }
 
+.download-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
 .download-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 3rem 2rem;
-  max-width: 500px;
-  margin: 0 auto;
+}
+
+.download-card-beta {
+  border-color: #f59e0b;
 }
 
 .version-badge {
@@ -229,6 +239,11 @@ section {
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
+}
+
+.version-badge-beta {
+  background-color: #f59e0b;
+  color: #000;
 }
 
 .download-card h3 {
@@ -320,6 +335,35 @@ section {
   color: var(--bg-primary);
 }
 
+/* Version History Sections */
+.versions-section {
+  margin-bottom: 2.5rem;
+}
+
+.versions-section:last-child {
+  margin-bottom: 0;
+}
+
+.versions-section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.versions-section[data-channel="beta"] .versions-section-title {
+  color: #f59e0b;
+}
+
+.versions-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1.5rem;
+  font-size: 0.9375rem;
+}
+
 .loading {
   text-align: center;
   color: var(--text-muted);
@@ -390,6 +434,10 @@ section {
   }
 
   .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .download-group {
     grid-template-columns: 1fr;
   }
 

@@ -27,6 +27,7 @@ DRY_RUN=false
 APK_PATH=""
 NOTES=""
 REMOTE=""
+CHANNEL="stable"
 
 # Help message
 function show_help() {
@@ -38,6 +39,7 @@ function show_help() {
     echo "Options:"
     echo "  --apk <path>        Path to APK file to deploy"
     echo "  --notes <text>      Release notes for this version"
+    echo "  --channel <name>    Release channel: stable (default) or beta"
     echo "  --dry-run           Show what would be done without executing"
     echo "  -h, --help          Show this help message"
     echo ""
@@ -54,6 +56,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --notes)
             NOTES="$2"
+            shift 2
+            ;;
+        --channel)
+            CHANNEL="$2"
             shift 2
             ;;
         --dry-run)
@@ -164,14 +170,30 @@ else
         const data = $VERSIONS_JSON;
         const version = '$VERSION';
         const date = '$TODAY';
+        const channel = '$CHANNEL';
         const notes = '$NOTES' || 'Update to version ' + version;
         const hasApk = $([[ -n '$APK_PATH' ]] && echo 'true' || echo 'false');
+
+        // Migrate latest from string to object if needed
+        if (typeof data.latest === 'string') {
+            data.latest = { stable: data.latest, beta: '' };
+        }
+        if (!data.latest || typeof data.latest !== 'object') {
+            data.latest = { stable: '', beta: '' };
+        }
+        data.latest[channel] = version;
+
+        // Migrate existing releases without channel field
+        data.releases.forEach(function(r) {
+            if (!r.channel) r.channel = 'stable';
+        });
 
         // Find existing release
         const existingIndex = data.releases.findIndex(r => r.version === version);
 
         const release = {
             version: version,
+            channel: channel,
             date: date,
             versionCode: parseInt(version.split('.').join('')),
             apk: hasApk ? 'apks/$APK_FILENAME' : (existingIndex >= 0 ? data.releases[existingIndex].apk : ''),
@@ -186,8 +208,6 @@ else
             // Add new release at the beginning
             data.releases.unshift(release);
         }
-
-        data.latest = version;
 
         fs.writeFileSync('$VERSIONS_FILE', JSON.stringify(data, null, 2) + '\\n');
         console.log('Updated versions.json');
