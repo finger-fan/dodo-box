@@ -4,6 +4,25 @@ All Android APK releases for dodo-box are documented here.
 
 ---
 
+## v0.8.8 — 2026-03-28
+
+### Features
+- Add OTA update support and landing page site
+- Add release signing config and custom APK naming
+
+### Bug Fixes
+- Validate petnames from relay and cache to prevent garbled nicknames
+
+### Improvements
+- Add Android build environment setup to publish command
+
+### APK Info
+- File: android/app/build/outputs/apk/release/dodo-box-0.8.8-20260328.apk
+- Version: 0.8.8 (versionCode: 4)
+- Size: 5.9M
+
+---
+
 ## v0.8.8 — 2026-03-27
 
 ### Features
