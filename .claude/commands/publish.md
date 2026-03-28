@@ -17,6 +17,102 @@ Android APK publishing pipeline for dodo-box:
 
 ---
 
+## Prerequisites — Android Build Environment
+
+Before running this command, the machine must have the Android build toolchain installed. If missing, follow these steps to set it up (tested on Ubuntu/Debian):
+
+### 1. Install JDK 21
+
+AGP (Android Gradle Plugin) 8.13 requires JDK 17+. We use JDK 21:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y openjdk-21-jdk
+```
+
+Set `JAVA_HOME` (add to `~/.bashrc` or `~/.profile`):
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+Verify: `java -version` should show `openjdk version "21.x.x"`.
+
+### 2. Install Android SDK
+
+Download and install the command-line tools:
+
+```bash
+sudo mkdir -p /opt/android-sdk/cmdline-tools
+cd /tmp
+wget https://dl.google.com/android/repository/commandlinetools-linux-latest.zip
+unzip commandlinetools-linux-latest.zip
+sudo mv cmdline-tools /opt/android-sdk/cmdline-tools/latest
+```
+
+Set environment variables (add to `~/.bashrc` or `~/.profile`):
+
+```bash
+export ANDROID_HOME=/opt/android-sdk
+export ANDROID_SDK_ROOT=/opt/android-sdk
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+```
+
+### 3. Install required SDK components
+
+This project requires:
+- **compileSdkVersion / targetSdkVersion**: 36
+- **minSdkVersion**: 24
+- **Build-Tools**: 35.0.0, 36.0.0
+- **Platform-Tools**: latest
+
+```bash
+sdkmanager --sdk_root=/opt/android-sdk \
+  "platforms;android-36" \
+  "build-tools;35.0.0" \
+  "build-tools;36.0.0" \
+  "platform-tools"
+```
+
+Accept licenses:
+
+```bash
+yes | sdkmanager --sdk_root=/opt/android-sdk --licenses
+```
+
+### 4. Gradle (no manual install needed)
+
+The project includes a Gradle wrapper (`android/gradlew`) that auto-downloads **Gradle 8.14.3**. No manual Gradle installation is required. On first build, it will download automatically.
+
+### 5. Verify environment
+
+Run these checks before proceeding:
+
+```bash
+java -version                    # Should be 21.x
+echo $ANDROID_HOME               # Should be /opt/android-sdk
+sdkmanager --list_installed       # Should show platforms;android-36, build-tools;36.0.0
+cd android && ./gradlew --version # Should show Gradle 8.14.3
+```
+
+If any check fails, fix it before continuing. The APK build will fail without a proper environment.
+
+### Version Reference (as of 2026-03-28)
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| JDK | OpenJDK 21 | Required by AGP 8.13 (minimum JDK 17) |
+| Android Gradle Plugin | 8.13.0 | Set in `android/build.gradle` |
+| Gradle | 8.14.3 | Auto-downloaded by wrapper |
+| compileSdkVersion | 36 | Set in `android/variables.gradle` |
+| targetSdkVersion | 36 | Set in `android/variables.gradle` |
+| minSdkVersion | 24 | Set in `android/variables.gradle` |
+| Build-Tools | 35.0.0 + 36.0.0 | Both needed |
+| Capacitor Android | 14.0.1 (cordovaAndroidVersion) | Set in `android/variables.gradle` |
+
+---
+
 ## Step 1 — Switch to release branch
 
 ```bash
