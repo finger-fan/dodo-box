@@ -10,7 +10,7 @@
 
 | Phase | 目标 | 预计工期 | 状态 |
 |---|---|---|---|
-| Phase 1 | 修复构建阻塞 | 1-2 天 | 未开始 |
+| Phase 1 | 修复构建阻塞 | 1-2 天 | 已完成 |
 | Phase 2 | 修复 Docker 部署 | 1-2 天 | 未开始 |
 | Phase 3 | 运行时可靠性补齐 | 2-3 天 | 未开始 |
 | Phase 4 | 测试修复与补齐 | 2-3 天 | 未开始 |
@@ -22,17 +22,17 @@
 
 ### 任务清单
 
-- [ ] **T1.1** 修复 `tests/integration/contexts/NostrContext.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
-- [ ] **T1.2** 修复 `tests/integration/hooks/use-messages.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
-- [ ] **T1.3** 修复 `tests/integration/hooks/use-messages-rapid.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
-- [ ] **T1.4** 修复 `tests/unit/hooks/use-chats.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
-- [ ] **T1.5** 修复 `tests/unit/hooks/use-contacts.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
-- [ ] **T1.6** 修复 pnpm 构建脚本授权配置
+- [x] **T1.1** 修复 `tests/integration/contexts/NostrContext.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
+- [x] **T1.2** 修复 `tests/integration/hooks/use-messages.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
+- [x] **T1.3** 修复 `tests/integration/hooks/use-messages-rapid.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
+- [x] **T1.4** 修复 `tests/unit/hooks/use-chats.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
+- [x] **T1.5** 修复 `tests/unit/hooks/use-contacts.test.tsx` 中 `NostrContext` mock 缺少 `adapterMode` / `setAdapterMode` 的类型错误
+- [x] **T1.6** 修复 pnpm 构建脚本授权配置
   - 方案 A：将 `pnpm-workspace.yaml` 的 `allowBuilds` 改为有效的 `onlyBuiltDependencies` 列表
   - 方案 B：删除 `pnpm-workspace.yaml` 并改用 `.npmrc` 配置 `onlyBuiltDependencies`
-- [ ] **T1.7** 删除 `package-lock.json`（项目使用 pnpm）
-- [ ] **T1.8** 验证 `pnpm check` 通过
-- [ ] **T1.9** 验证 `pnpm test` 仍通过（202 个测试）
+- [x] **T1.7** 删除 `package-lock.json`（项目使用 pnpm）
+- [x] **T1.8** 验证 `pnpm check` 通过
+- [x] **T1.9** 验证 `pnpm test` 仍通过（202 个测试）
 
 ### Phase 1 验收标准
 
