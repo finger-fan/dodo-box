@@ -6,7 +6,10 @@ import {
   UserCircle, LogOut, Globe, Moon, Shield,
   Trash2, Download, ChevronRight, Clock,
   RefreshCw, RotateCcw, Loader2,
+  Server, Pencil,
 } from 'lucide-react';
+import { getRelayStatusMap } from '@/lib/welshman/relay-manager';
+import { SocketStatus } from '@welshman/net';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
 import Toast from '@/components/ui/Toast';
@@ -17,6 +20,7 @@ import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
+import type { AdapterMode } from '@/lib/nostr';
 
 const TTL_OPTIONS = [
   { value: 600, labelKey: 'settings.ttl_10min' },
@@ -32,12 +36,15 @@ export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const router = useRouter();
-  const { session, logout, adapter } = useNostr();
+  const { session, adapter, adapterMode, setAdapterMode, logout } = useNostr();
 
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const mounted = useMounted();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [relays, setRelays] = useState(() => adapter.getRelays());
+  const [isEditingRelays, setIsEditingRelays] = useState(false);
+  const [relayInput, setRelayInput] = useState(() => relays.join('\n'));
+  const [statusMap, setStatusMap] = useState<Map<string, SocketStatus>>(new Map());
   const [messageTtl, setMessageTtl] = useState(() => {
     try {
       const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null;
@@ -48,6 +55,13 @@ export default function SettingsPage() {
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
+
+  useEffect(() => {
+    const update = () => setStatusMap(getRelayStatusMap());
+    update();
+    const id = setInterval(update, 3000);
+    return () => clearInterval(id);
+  }, []);
   const updater = useUpdater();
   const isNative = mounted && Capacitor.isNativePlatform();
 
@@ -77,6 +91,38 @@ export default function SettingsPage() {
 
   const handleToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
+  };
+
+  function getStatusColor(status?: SocketStatus) {
+    if (status === SocketStatus.Open) return 'bg-emerald-500';
+    if (status === SocketStatus.Opening) return 'bg-amber-500';
+    return 'bg-red-500';
+  }
+
+  const handleRelaySave = async () => {
+    const newRelays = relayInput
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter((url, i, arr) => arr.indexOf(url) === i);
+    const result = await adapter.setRelays(newRelays);
+    if (result.success) {
+      setRelays(newRelays);
+      setIsEditingRelays(false);
+      handleToast(t('settings.relays_updated'), 'success');
+    } else {
+      handleToast(result.error || 'Failed to update relays', 'error');
+    }
+  };
+
+  const handleAdapterModeChange = (mode: AdapterMode) => {
+    setAdapterMode(mode);
+    // After switching, redirect to login for real mode, or stay for mock
+    if (mode === 'mock-telegram') {
+      handleToast('Switched to Telegram Mock mode', 'success');
+    } else {
+      handleToast('Switched to Nostr Real mode — please login again', 'success');
+    }
   };
 
   if (!mounted) return null;
@@ -182,6 +228,33 @@ export default function SettingsPage() {
                 )} />
               </button>
             </div>
+            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Server className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Connection Mode</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">
+                    {adapterMode === 'mock-telegram' ? 'Using Mock Telegram' : 'Using Nostr Relays'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+                <button
+                  onClick={() => handleAdapterModeChange('real')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'real' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Nostr</button>
+                <button
+                  onClick={() => handleAdapterModeChange('mock-telegram')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'mock-telegram' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Mock</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -195,16 +268,54 @@ export default function SettingsPage() {
                   <Shield className="w-5 h-5 text-zinc-400" />
                   <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.relays')}</span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded uppercase">{relays.length} Configured</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded uppercase">{relays.length} {t('settings.relays_configured')}</span>
+                  <button
+                    onClick={() => { setIsEditingRelays(true); setRelayInput(relays.join('\n')); }}
+                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                    aria-label={t('common.edit')}
+                    title={t('common.edit')}
+                  >
+                    <Pencil className="w-4 h-4 text-zinc-400" />
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2">
-                {relays.map((relay) => (
-                  <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
-                    <span>{relay}</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {isEditingRelays ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={relayInput}
+                    onChange={(e) => setRelayInput(e.target.value)}
+                    className="w-full h-32 p-3 text-xs font-mono bg-zinc-50 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    placeholder="wss://relay.example.com"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRelaySave}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors"
+                    >
+                      {t('common.save')}
+                    </button>
+                    <button
+                      onClick={() => setIsEditingRelays(false)}
+                      className="flex-1 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      {t('common.cancel')}
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {relays.map((relay) => (
+                    <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
+                      <span>{relay}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] capitalize">{statusMap.get(relay) || 'disconnected'}</span>
+                        <div className={cn('w-1.5 h-1.5 rounded-full', getStatusColor(statusMap.get(relay)))} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
               <div className="flex items-center justify-between">

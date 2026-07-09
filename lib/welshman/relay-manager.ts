@@ -6,6 +6,7 @@ import type { Filter, TrustedEvent, SignedEvent } from '@welshman/util'
 import type { PublishResultsByRelay } from '@welshman/net'
 import { getPool, getTracker, getRepository } from './engine'
 import { SocketStatus } from '@welshman/net'
+import { SocketEvent } from '@welshman/net'
 
 const DEFAULT_REQUEST_TIMEOUT = 8000
 
@@ -135,4 +136,61 @@ export function getFailedRelays(): string[] {
     }
   }
   return failed
+}
+
+/**
+ * Get a map of all known relay URLs to their current connection status.
+ */
+export function getRelayStatusMap(): Map<string, SocketStatus> {
+  const pool = getPool()
+  const map = new Map<string, SocketStatus>()
+  for (const [url, socket] of pool._data.entries()) {
+    map.set(url, socket.status)
+  }
+  return map
+}
+
+/**
+ * Wait for a relay to reach the Open status.
+ * Returns true if connected, false on timeout or terminal error.
+ */
+export function waitForRelayConnection(
+  url: string,
+  timeout = 10000
+): Promise<boolean> {
+  return new Promise(resolve => {
+    try {
+      connectToRelays([url])
+      const pool = getPool()
+      const socket = pool.get(url)
+
+      if (socket.status === SocketStatus.Open) {
+        return resolve(true)
+      }
+      if (socket.status === SocketStatus.Error || socket.status === SocketStatus.Closed) {
+        return resolve(false)
+      }
+
+      const timer = setTimeout(() => {
+        cleanup()
+        resolve(false)
+      }, timeout)
+
+      const onStatus = (status: SocketStatus) => {
+        if (status === SocketStatus.Open) {
+          cleanup()
+          resolve(true)
+        }
+      }
+
+      const cleanup = () => {
+        clearTimeout(timer)
+        socket.off(SocketEvent.Status, onStatus)
+      }
+
+      socket.on(SocketEvent.Status, onStatus)
+    } catch {
+      resolve(false)
+    }
+  })
 }

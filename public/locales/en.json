@@ -49,7 +49,9 @@
     "identity_deleted": "Identity deleted",
     "coming_soon": "Coming soon",
     "contact_cache": "Contact Cache",
-    "contact_cache_desc": "Cache contact names locally to reduce loading delay. Disable for maximum privacy."
+    "contact_cache_desc": "Cache contact names locally to reduce loading delay. Disable for maximum privacy.",
+    "relays_configured": "Configured",
+    "relays_updated": "Relays updated"
   },
   "contacts": {
     "add_contact": "Add Contact",
@@ -98,5 +100,13 @@
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Please try again.",
     "retry": "Try again"
+  },
+  "messages": {
+    "no_chats": "No chats yet",
+    "add_contact_prompt": "Add a contact to start chatting",
+    "add_contact": "Add Contact"
+  },
+  "auth": {
+    "refresh_logout": "For your security, you've been logged out after refreshing"
   }
 }

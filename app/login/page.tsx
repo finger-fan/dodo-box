@@ -15,20 +15,29 @@ import { version } from '@/package.json';
 export default function LoginPage() {
   const router = useRouter();
   const { login, register, session } = useNostr();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { resolvedTheme, setTheme } = useTheme();
   const [view, setView] = useState<'initial' | 'login' | 'register'>('initial');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const mounted = useMounted();
 
+ useEffect(() => {
+   if (session.isAuthenticated) {
+     router.push('/messages');
+   }
+ }, [session.isAuthenticated, router]);
+
   useEffect(() => {
-    if (session.isAuthenticated) {
-      router.push('/messages');
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem('dodobox_refresh_logout') === 'true') {
+      const message = t('auth.refresh_logout');
+      queueMicrotask(() => setToast({ message, type: 'info' }));
+      localStorage.removeItem('dodobox_refresh_logout');
     }
-  }, [session.isAuthenticated, router]);
+  }, [t]);
 
   const handleLogin = async () => {
     if (!username || !password) return;

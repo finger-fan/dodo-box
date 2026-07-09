@@ -11,6 +11,7 @@ vi.mock('@/lib/nostr/vault-sync', () => ({
     fetchVault: vi.fn(),
     createVault: vi.fn(),
     updateVault: vi.fn(),
+    setRelayUrls: vi.fn(),
   },
 }))
 
