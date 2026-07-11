@@ -27,7 +27,7 @@ function ensureDir(): void {
   }
 }
 
-function loadConfig(): CliConfig | null {
+function loadCliConfig(): CliConfig | null {
   if (!existsSync(CONFIG_FILE)) return null
   try {
     return JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as CliConfig
@@ -36,7 +36,7 @@ function loadConfig(): CliConfig | null {
   }
 }
 
-function saveConfig(config: CliConfig): void {
+function saveCliConfig(config: CliConfig): void {
   ensureDir()
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8')
 }
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
   initNodeEngine()
 
   // Load or create config
-  const config = loadConfig()
+  const config = loadCliConfig()
   const defaultRelays = getDefaultRelays()
 
   let username: string
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
 
     const session = await createSession(username, password)
     saveVault(serializeSession(session))
-    saveConfig({ relays: defaultRelays, username, password })
+    saveCliConfig({ relays: defaultRelays, username, password })
 
     console.log(`\n✅ Registered as @${username}`)
     console.log(`   Pubkey: ${session.masterPubkey.slice(0, 16)}...\n`)
@@ -122,6 +122,9 @@ async function main(): Promise<void> {
   console.log(`📡 Online as @${session.currentIdentity.name}`)
   console.log(`   Pubkey: ${session.masterPubkey.slice(0, 16)}...\n`)
 
+  // Initialize relay quality tracking
+  initTracking(relays)
+
   // Start receiving messages
   const receivedMessages: ReceivedMessage[] = []
   const onMessage = (msg: ReceivedMessage) => {
@@ -142,7 +145,7 @@ async function main(): Promise<void> {
     new Promise((resolve) => rl.question(q, resolve))
 
   console.log('Type a 64-char hex pubkey to send a message.')
-  console.log('Commands: /status  /list  /help  /quit\n')
+  console.log('Commands: /status  /list  /contacts  /quality  /help  /quit\n')
 
   while (true) {
     const input = await question('> ')
@@ -158,14 +161,22 @@ async function main(): Promise<void> {
       console.log(`
 Commands:
   <64-char hex pubkey>  Send a DM to this pubkey
+  /addnpub <npub>       Add a contact by npub
+  /add <pubkey>         Add a contact by pubkey
+  /remove <pubkey>      Remove a contact
+  /contacts             List all contacts
   /list                 Show last 20 received messages
+  /history <pubkey>     Show message history with a contact
+  /profile <pubkey>     Lookup a user's profile
+  /quality              Test relay quality
   /status               Show relay connection status
   /quit                 Exit
 
 Tips:
   - Messages are sent via NIP-59 gift wrap (encrypted)
   - Incoming messages appear instantly
-  - No local history (walkie-talkie mode)
+  - No local history by default (walkie-talkie mode)
+  - Use /history to view past messages
 `)
       continue
     }
@@ -187,6 +198,89 @@ Tips:
           console.log(`  [${m.timestamp.toLocaleTimeString()}] ${m.senderPubkey.slice(0, 8)}...: "${m.text}"`)
         }
       }
+      continue
+    }
+
+    if (trimmed === '/contacts') {
+      listContacts(CONFIG_DIR)
+      continue
+    }
+
+    if (trimmed.startsWith('/addnpub ')) {
+      const npub = trimmed.slice(9).trim()
+      const contact = addContact(CONFIG_DIR, npub)
+      continue
+    }
+
+    if (trimmed.startsWith('/add ')) {
+      const parts = trimmed.split(/\s+/)
+      const pubkey = parts[1]
+      const name = parts.slice(2).join(' ') || undefined
+      addContact(CONFIG_DIR, pubkey, name)
+      continue
+    }
+
+    if (trimmed.startsWith('/remove ')) {
+      const pubkey = trimmed.slice(8).trim()
+      removeContact(CONFIG_DIR, pubkey)
+      continue
+    }
+
+    if (trimmed.startsWith('/history ')) {
+      const pubkey = trimmed.slice(9).trim()
+      if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
+        console.log('  ❌ Invalid pubkey format\n')
+        continue
+      }
+      console.log(`  Fetching history with ${pubkey.slice(0, 16)}...`)
+      const { fetchRecentMessages } = await import('./contacts')
+      const messages = await fetchRecentMessages(
+        session.masterPubkey,
+        session.masterPrivkey,
+        pubkey,
+        relays,
+        20
+      )
+
+      if (messages.length === 0) {
+        console.log('  No recent messages found.\n')
+      } else {
+        console.log(`\n  Recent messages (${messages.length}):`)
+        console.log('  ──────────────────────────────────────')
+        for (const m of messages.reverse()) {
+          console.log(`  [${m.timestamp.toLocaleTimeString()}] ${m.senderPubkey === session.masterPubkey ? 'You' : m.senderPubkey.slice(0, 8) + '...'}: "${m.text}"`)
+        }
+        console.log('  ──────────────────────────────────────\n')
+      }
+      continue
+    }
+
+    if (trimmed.startsWith('/profile ')) {
+      const pubkey = trimmed.slice(9).trim()
+      if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
+        console.log('  ❌ Invalid pubkey format\n')
+        continue
+      }
+      console.log(`  Looking up profile for ${pubkey.slice(0, 16)}...`)
+      const profile = await fetchProfile(pubkey, relays)
+
+      if (profile.name || profile.displayName) {
+        console.log(`  Name: ${profile.name || profile.displayName}`)
+      }
+      if (profile.about) {
+        console.log(`  About: ${profile.about}`)
+      }
+      if (profile.picture) {
+        console.log(`  Picture: ${profile.picture}`)
+      }
+      if (!profile.name && !profile.displayName && !profile.about) {
+        console.log('  No profile information found.\n')
+      }
+      continue
+    }
+
+    if (trimmed === '/quality') {
+      await testAllRelays(session.masterPrivkey)
       continue
     }
 
