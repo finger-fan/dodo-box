@@ -1,12 +1,15 @@
 // main.ts — DodoBox CLI: walkie-talkie style Nostr messaging
 
-import { connectRelays, getStatus, getDefaultRelays } from './relay'
+import { connectRelays, getStatus, getDefaultRelays, disconnect } from './relay'
 import { createSession, serializeSession } from '../lib/messaging/session'
 import { sendDirectMessage } from './sender'
 import { startReceiving } from './receiver'
 import type { ReceivedMessage } from './receiver'
 import type { CliSession } from '../lib/messaging/session'
 import { initNodeEngine, destroyNodeEngine } from '../lib/welshman/engine-node'
+import { loadContacts, addContact, removeContact, listContacts } from './contacts'
+import { fetchProfile } from './profile'
+import { initTracking, testAllRelays } from './quality'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import readline from 'node:readline'

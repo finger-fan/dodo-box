@@ -65,6 +65,6 @@ export function updateRelays(configDir: string, relays: string[]): void {
     ...(existing || {}),
     relays: [...relays],
     defaultRelays: [...relays],
-  }
+  } as CliConfig
   saveConfig(configDir, config)
 }
