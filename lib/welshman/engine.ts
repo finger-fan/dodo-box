@@ -11,16 +11,12 @@ let pool: Pool
 let tracker: Tracker
 let wrapManager: WrapManager
 
-function ensureClient(): boolean {
-  return typeof window !== 'undefined'
-}
-
 /**
  * Initialize welshman engine singletons. Safe to call multiple times (idempotent).
- * Must only be called on the client side.
+ * Works in both browser and Node.js environments.
  */
 export function initEngine(): void {
-  if (initialized || !ensureClient()) return
+  if (initialized) return
 
   repository = Repository.get()
   pool = Pool.get()
@@ -36,24 +32,24 @@ export function initEngine(): void {
   initialized = true
 }
 
-export function getRepository(): Repository {
+export function getRepository(): Repository | null {
   if (!initialized) initEngine()
-  return repository
+  return initialized ? repository : null
 }
 
-export function getPool(): Pool {
+export function getPool(): Pool | null {
   if (!initialized) initEngine()
-  return pool
+  return initialized ? pool : null
 }
 
-export function getTracker(): Tracker {
+export function getTracker(): Tracker | null {
   if (!initialized) initEngine()
-  return tracker
+  return initialized ? tracker : null
 }
 
-export function getWrapManager(): WrapManager {
+export function getWrapManager(): WrapManager | null {
   if (!initialized) initEngine()
-  return wrapManager
+  return initialized ? wrapManager : null
 }
 
 export function isEngineInitialized(): boolean {
