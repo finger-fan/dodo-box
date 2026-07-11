@@ -59,8 +59,12 @@ export function saveConfig(configDir: string, config: CliConfig): void {
 }
 
 export function updateRelays(configDir: string, relays: string[]): void {
-  const config = loadConfig(configDir) || { ...DEFAULT_CONFIG, relays: [...relays] }
-  config.relays = relays
-  config.defaultRelays = [...relays]
+  const existing = loadConfig(configDir)
+  const config: CliConfig = {
+    ...DEFAULT_CONFIG,
+    ...(existing || {}),
+    relays: [...relays],
+    defaultRelays: [...relays],
+  }
   saveConfig(configDir, config)
 }

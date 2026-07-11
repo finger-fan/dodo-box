@@ -45,14 +45,14 @@ export async function fetchProfile(
     return emptyProfile
   }
 
-  const event = events[0].event as SignedEvent
+  const signedEvent = events[0] as unknown as SignedEvent
 
   try {
-    const profileData = JSON.parse(event.content) as Partial<NostrProfile>
+    const profileData = JSON.parse(signedEvent.content) as Partial<NostrProfile>
     const profile: NostrProfile = {
       pubkey,
       name: profileData.name,
-      displayName: profileData.display_name || profileData.name,
+      displayName: profileData.displayName || profileData.name,
       picture: profileData.picture,
       about: profileData.about,
       nip05: profileData.nip05,

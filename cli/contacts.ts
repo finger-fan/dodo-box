@@ -3,8 +3,7 @@
 
 import { fetchEvents } from '../lib/messaging/relay-node'
 import { decryptGiftWrap } from '@/lib/welshman/crypto'
-import { signEvent, getPubkey } from '@welshman/util'
-import type { SignedEvent, Filter } from '@welshman/util'
+import type { Filter, SignedEvent } from '@welshman/util'
 
 export interface CliContact {
   pubkey: string
@@ -188,7 +187,7 @@ export async function fetchRecentMessages(
   const messages: Array<{ text: string; senderPubkey: string; timestamp: Date }> = []
 
   for (const event of events) {
-    const signedEvent = event.event as SignedEvent
+    const signedEvent = event as unknown as SignedEvent
 
     // Decrypt the gift wrap
     const inner = await decryptGiftWrap(signedEvent, myPrivkey)

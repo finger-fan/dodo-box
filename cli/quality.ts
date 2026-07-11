@@ -1,8 +1,7 @@
 // quality.ts — Relay quality monitoring for CLI
 // Tracks latency and success rate per relay
 
-import { connectToRelays, publishEvent, subscribe, fetchEvents } from '../lib/messaging/relay-node'
-import { signEvent } from '@/lib/welshman/crypto'
+import { connectToRelays, publishEvent } from '../lib/messaging/relay-node'
 import type { SignedEvent } from '@welshman/util'
 
 export interface RelayQuality {
@@ -51,16 +50,16 @@ export async function testRelayQuality(
     // Connect to the relay
     connectToRelays([relayUrl])
 
-    // Try to publish a test event
-    const testEvent = signEvent(
-      1, // kind:1 note
+    // Try to publish a test event using welshman crypto
+    const { buildDirectMessageEvent } = await import('@/lib/welshman/crypto')
+    const testEvent = buildDirectMessageEvent(
       `dodobox-cli-test-${Date.now()}`,
-      [],
+      testPrivkey, // use self as recipient for test
       testPrivkey
     ) as SignedEvent
 
     const results = await publishEvent(testEvent, [relayUrl], { timeout: 5000 })
-    success = Object.values(results).some((r) => r.status === 'published')
+    success = Object.values(results).some((r: { status: string }) => r.status === 'published')
   } catch {
     success = false
   }
