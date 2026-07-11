@@ -23,6 +23,8 @@ android/local.properties
 out/
 .cap-backup/
 
+.claude/settings.json.*
+
 # Keystore
 android/sign-key/
 *.keystore
