@@ -2,14 +2,14 @@
 
 import { connectRelays, getStatus, getDefaultRelays, disconnect } from './relay'
 import { createSession, serializeSession } from '../lib/messaging/session'
-import { sendDirectMessage } from './sender'
-import { startReceiving } from './receiver'
-import type { ReceivedMessage } from './receiver'
+import { sendDirectMessage } from '../lib/messaging/sender'
+import { startReceiving } from '../lib/messaging/receiver'
+import type { ReceivedMessage } from '../lib/messaging/receiver'
 import type { CliSession } from '../lib/messaging/session'
 import { initNodeEngine, destroyNodeEngine } from '../lib/welshman/engine-node'
-import { loadContacts, addContact, removeContact, listContacts } from './contacts'
-import { fetchProfile } from './profile'
-import { initTracking, testAllRelays } from './quality'
+import { loadContacts, addContact, removeContact, listContacts, fetchRecentMessages } from '../lib/messaging/contacts'
+import { fetchProfile } from '../lib/messaging/profile'
+import { initTracking, testAllRelays } from '../lib/messaging/relay-quality'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import readline from 'node:readline'
@@ -236,7 +236,6 @@ Tips:
         continue
       }
       console.log(`  Fetching history with ${pubkey.slice(0, 16)}...`)
-      const { fetchRecentMessages } = await import('./contacts')
       const messages = await fetchRecentMessages(
         session.masterPubkey,
         session.masterPrivkey,
