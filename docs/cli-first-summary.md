@@ -131,9 +131,57 @@ lib/welshman/           ← Welshman 适配层
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
+| `lib/messaging/contacts.ts` | ~217 | 联系人管理 (add/remove/list)、npub 解码、历史消息查询 |
+| `lib/messaging/profile.ts` | ~93 | Nostr profile (kind:0) 查询 + 内存缓存 |
+| `lib/messaging/relay-quality.ts` | ~145 | 中继质量监控 (延迟 + 成功率) |
 | `cli/config.ts` | ~70 | CLI 本地配置管理 (`~/.dodobox/config.json`) |
 
-**注意:** Phase 2 原计划添加的 contacts/profile/quality 模块已重构到 `lib/messaging/` 共享层，不在本次提交中。
+### Phase 3: 代码分层重构 ✅
+
+**问题**: Phase 2 将 contacts/profile/quality 直接创建在 `cli/` 下，但这些是协议层逻辑，不应属于 CLI 模块。
+
+**重构操作**: 将共享协议逻辑从 `cli/` 迁移到 `lib/messaging/`
+
+| 原位置 | 新位置 | 说明 |
+|--------|--------|------|
+| `cli/contacts.ts` | `lib/messaging/contacts.ts` | 联系人管理 + 历史消息 |
+| `cli/profile.ts` | `lib/messaging/profile.ts` | Profile 查询 |
+| `cli/quality.ts` | `lib/messaging/relay-quality.ts` | 中继质量测试 |
+| `cli/sender.ts` | `lib/messaging/sender.ts` | 消息发送 (已有) |
+| `cli/receiver.ts` | `lib/messaging/receiver.ts` | 消息接收 (已有) |
+| `cli/relay.ts` | `lib/messaging/relay-node.ts` | Relay 连接 (已有) |
+
+**最终架构**:
+
+```
+lib/messaging/          ← 共享协议层 (框架无关，CLI + UI 共用)
+├── session.ts          ← 身份/会话管理
+├── sender.ts           ← 消息发送 (NIP-59 gift wrap)
+├── receiver.ts         ← 消息接收 (订阅 + 解密)
+├── types.ts            ← 类型定义
+├── relay-node.ts       ← Node.js relay 连接
+├── vault-crypto-node.ts ← Node.js AES-GCM
+├── contacts.ts         ← 联系人管理 + 历史消息
+├── profile.ts          ← Profile 查询
+└── relay-quality.ts    ← 中继质量测试
+
+cli/                    ← CLI 交互层 (仅 readline 终端输出)
+├── main.ts             ← 入口 + 交互循环
+└── config.ts           ← CLI 本地配置
+
+lib/welshman/           ← Welshman 适配层
+├── engine.ts           ← 浏览器版单例
+├── engine-node.ts      ← Node.js 版单例
+├── crypto.ts           ← 签名/gift wrap
+└── relay-manager.ts    ← 浏览器版 relay 管理
+```
+
+**关键设计原则**:
+- `lib/messaging/` 是纯逻辑层，无框架依赖
+- CLI 只负责 readline 交互和终端输出
+- UI 未来可以直接 import `lib/messaging/` 的消息逻辑
+- 两个前端共享同一套协议实现
+- CLI 不持有协议逻辑（contacts/profile/quality 都是协议层功能）
 
 ---
 
@@ -146,6 +194,14 @@ lib/welshman/           ← Welshman 适配层
 | 单元测试 | ✅ 207 passed | `pnpm test` |
 | 端到端 relay 测试 | ⏳ 待验证 | 需要真实网络环境 |
 | CLI 实际运行 | ❌ 未测试 | 需要手动运行验证 |
+
+### 代码分层状态
+
+| 层级 | 内容 | 状态 |
+|------|------|------|
+| `lib/messaging/` (共享协议层) | session, sender, receiver, contacts, profile, relay-quality | ✅ 已完成 |
+| `cli/` (交互层) | main.ts (readline), config.ts | ✅ 已完成 |
+| `lib/welshman/` (适配层) | engine, crypto, relay-manager | ✅ 已完成 |
 
 ---
 
@@ -211,15 +267,11 @@ lib/welshman/           ← Welshman 适配层
 
 ## 七、文件清单
 
-### 新增文件 (Phase 0+1+2)
+### 新增文件 (Phase 0+1+2+3)
 ```
 cli/
 ├── main.ts              ← CLI 入口 + 交互循环
-├── config.ts            ← CLI 本地配置管理
-├── relay.ts             ← Relay 连接管理
-├── sender.ts            ← 消息发送封装
-├── receiver.ts          ← 消息接收封装
-└── tsconfig.json        ← CLI TypeScript 配置
+└── config.ts            ← CLI 本地配置管理
 
 lib/messaging/
 ├── session.ts           ← 会话管理
@@ -227,7 +279,10 @@ lib/messaging/
 ├── receiver.ts          ← 消息接收逻辑
 ├── types.ts             ← 类型定义
 ├── relay-node.ts        ← Node.js relay 层
-└── vault-crypto-node.ts ← Node.js 加密模块
+├── vault-crypto-node.ts ← Node.js 加密模块
+├── contacts.ts          ← 联系人管理 + 历史消息
+├── profile.ts           ← Profile 查询
+└── relay-quality.ts     ← 中继质量测试
 
 lib/welshman/
 └── engine-node.ts       ← Node.js 引擎初始化
