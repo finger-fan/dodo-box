@@ -35,9 +35,9 @@ export async function sendDirectMessage(
     // Connect to relays first
     connectToRelays(relayUrls)
 
-    // Build inner kind-14 DM event
+    // Build inner kind-14 DM event — content is always wrapped as { text }
     const seq = nextSeq()
-    const innerEvent = buildDirectMessageEvent(content, recipientPubkey, senderPrivkeyHex, seq) as SignedEvent
+    const innerEvent = buildDirectMessageEvent(JSON.stringify({ text: content }), recipientPubkey, senderPrivkeyHex, seq) as SignedEvent
 
     // Gift wrap for recipient
     const wrapForRecipient = await createGiftWrap(innerEvent, recipientPubkey, senderPrivkeyHex)

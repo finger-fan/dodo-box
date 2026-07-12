@@ -20,17 +20,10 @@ export type MessageCallback = (msg: ReceivedMessage) => void
  */
 function parseInnerEvent(event: SignedEvent): ReceivedMessage | null {
   try {
-    // Try to parse as JSON first (newer format)
-    let text: string
-    try {
-      const data = JSON.parse(event.content)
-      text = typeof data === 'string' ? data : data.text || data.content || ''
-    } catch {
-      // Fallback: treat as plain text (older format or direct string)
-      text = event.content
-    }
-
-    if (!text) return null
+    // Content is always JSON.stringify({ text: string })
+    const parsed = JSON.parse(event.content)
+    const text = parsed?.text
+    if (typeof text !== 'string' || !text) return null
 
     const tags = event.tags
     const senderPubkey = event.pubkey

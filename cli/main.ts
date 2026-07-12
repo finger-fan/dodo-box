@@ -197,16 +197,33 @@ async function main(): Promise<void> {
     onMessage
   )
 
-  // Interactive loop
+  // Interactive loop — persistent 'line' listener + input queue
+  // so user input during `await sendDirectMessage(...)` is not lost.
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  const question = (q: string): Promise<string> =>
-    new Promise((resolve) => rl.question(q, resolve))
+  const inputQueue: string[] = []
+  let inputResolver: ((v: string) => void) | null = null
+
+  rl.on('line', (line) => {
+    if (inputResolver) {
+      const resolve = inputResolver
+      inputResolver = null
+      resolve(line)
+    } else {
+      inputQueue.push(line)
+    }
+  })
+
+  const getNextInput = (prompt?: string): Promise<string> => {
+    if (prompt) process.stdout.write(prompt)
+    if (inputQueue.length > 0) return Promise.resolve(inputQueue.shift()!)
+    return new Promise((resolve) => { inputResolver = resolve })
+  }
 
   console.log('Use /select <name> to pick a contact, then just type to chat.')
   console.log('Commands: /me  /select  /contacts  /add  /remove  /status  /list  /profile  /quality  /help  /quit\n')
 
   while (true) {
-    const input = await question('> ')
+    const input = await getNextInput('> ')
     const trimmed = input.trim().toLowerCase()
 
     if (!trimmed) continue
@@ -404,7 +421,7 @@ Tips:
     if (/^[0-9a-f]{64}$/i.test(trimmed)) {
       const recipient = trimmed
       console.log(`\nSending to ${recipient.slice(0, 16)}...`)
-      const text = await question('  Message: ')
+      const text = await getNextInput('  Message: ')
       const result = await sendDirectMessage(text, recipient, session.masterPrivkey, relays)
 
       if (result.success) {
