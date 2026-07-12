@@ -192,8 +192,18 @@ lib/welshman/           ← Welshman 适配层
 | TypeScript 编译 | ✅ 0 errors | `tsc --noEmit -p cli/tsconfig.json` |
 | ESLint | ✅ 0 issues | `pnpm lint` |
 | 单元测试 | ✅ 207 passed | `pnpm test` |
-| 端到端 relay 测试 | ⏳ 待验证 | 需要真实网络环境 |
-| CLI 实际运行 | ❌ 未测试 | 需要手动运行验证 |
+| 端到端 relay 测试 | ✅ 通过 | 双向消息收发成功 |
+| CLI 实际运行 | ✅ 已测试 | 基本功能正常 |
+
+### 验证详情
+
+**端到端测试结果** (2026-07-12):
+- ✅ 两个 CLI 实例注册并连接 relay (3/3 连接)
+- ✅ A → B 发送 "hello bob from alice!" 成功
+- ✅ B → A 发送 "hello alice from bob!" 成功
+- ✅ 消息通过 NIP-59 gift wrap 加密
+- ✅ 2/3 relay 成功接收发布 (damus.io, nos.lol)
+- ⚠️ 发现消息重复接收问题（同一消息显示多次，可能是订阅去重问题）
 
 ### 代码分层状态
 
@@ -209,7 +219,7 @@ lib/welshman/           ← Welshman 适配层
 
 ### 短期 (本迭代)
 
-1. **验证 CLI 基本功能**
+1. **验证 CLI 基本功能** ✅ 已完成
    ```bash
    # 终端 1: 账户 A
    npx tsx cli/main.ts
@@ -224,11 +234,19 @@ lib/welshman/           ← Welshman 适配层
    # 粘贴到账户 A 的 CLI 中
    # 发送消息，观察账户 B 是否收到
    ```
+   
+   **测试结果**: ✅ 双向消息收发成功
+   - A → B 发送 "hello bob from alice!" ✅
+   - B → A 发送 "hello alice from bob!" ✅
+   - 消息通过 NIP-59 gift wrap 加密
+   - 2/3 relay 成功接收发布（damus.io, nos.lol）
 
-2. **修复已知问题**
-   - 确认 `initTracking` 等函数正确导入
-   - 验证 gift wrap 在 Node.js 环境下的兼容性
-   - 测试 welshman Pool 在 Node.js WebSocket 的表现
+2. **修复已知问题** ✅ 已完成
+   - **修复 Engine 单例重复问题**: `engine.ts` 和 `engine-node.ts` 原本各自创建独立的 pool/tracker，导致 CLI 连接和发送使用不同的 pool。现在 `engine-node.ts` 委托给 `engine.ts`，统一单例。
+   - **修复 Publish Status 检查**: welshman `publish()` 返回 `status: 'success'`，但代码检查的是 `'published'`，导致误判发送失败。
+
+3. **发现的问题** (待修复)
+   - `[receiver] Failed to parse inner event: <消息文本>` 警告日志 — 接收端日志显示奇怪的消息文本，需要调查 `decryptGiftWrap` 返回的数据结构。
 
 ### 中期 (下迭代)
 

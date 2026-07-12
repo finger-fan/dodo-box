@@ -16,6 +16,7 @@ const DEFAULT_REQUEST_TIMEOUT = 8000
  */
 export function connectToRelays(relayUrls: readonly string[]): void {
   const pool = getPool()
+  if (!pool) throw new Error('Pool not initialized')
   for (const url of relayUrls) {
     const socket = pool.get(url)
     if (socket.status === SocketStatus.Closed || socket.status === SocketStatus.Error) {
@@ -86,6 +87,7 @@ export function subscribe(
 
   const controller = new AbortController()
   const tracker = getTracker()
+  if (!tracker) throw new Error('Tracker not initialized')
 
   request({
     filters,
@@ -107,6 +109,7 @@ export function subscribe(
  */
 export function getConnectedRelays(): string[] {
   const pool = getPool()
+  if (!pool) return []
   const connected: string[] = []
   for (const [url, socket] of pool._data.entries()) {
     if (socket.status === SocketStatus.Open) {
@@ -121,6 +124,7 @@ export function getConnectedRelays(): string[] {
  */
 export function closeAllRelays(): void {
   const pool = getPool()
+  if (!pool) return
   pool.clear()
 }
 
@@ -129,6 +133,7 @@ export function closeAllRelays(): void {
  */
 export function getFailedRelays(): string[] {
   const pool = getPool()
+  if (!pool) return []
   const failed: string[] = []
   for (const [url, socket] of pool._data.entries()) {
     if (socket.status === SocketStatus.Error) {
@@ -144,6 +149,7 @@ export function getFailedRelays(): string[] {
 export function getRelayStatusMap(): Map<string, SocketStatus> {
   const pool = getPool()
   const map = new Map<string, SocketStatus>()
+  if (!pool) return map
   for (const [url, socket] of pool._data.entries()) {
     map.set(url, socket.status)
   }
@@ -162,6 +168,7 @@ export function waitForRelayConnection(
     try {
       connectToRelays([url])
       const pool = getPool()
+      if (!pool) return resolve(false)
       const socket = pool.get(url)
 
       if (socket.status === SocketStatus.Open) {

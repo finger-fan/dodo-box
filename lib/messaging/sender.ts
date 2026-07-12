@@ -45,9 +45,9 @@ export async function sendDirectMessage(
     // Publish wrapped event
     const results = await publishEvent(wrapForRecipient, relayUrls, { timeout: 10000 })
 
-    // Count successful relays
+    // Count successful relays (welshman publish returns status 'success')
     const successCount = Object.values(results).filter(
-      (r) => (r as any).status === 'published'
+      (r) => (r as any).status === 'success' || (r as any).status === 'published'
     ).length
 
     return {

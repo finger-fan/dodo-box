@@ -1,12 +1,10 @@
 // engine-node.ts - Node.js compatible welshman initialization
-// Browser version uses Repository (IndexedDB), Node version works without it
+// Thin wrapper around engine.ts with nodeMode=true.
+// Both CLI and UI share the SAME pool/tracker singletons via engine.ts.
 
-import { Pool, Tracker, netContext } from '@welshman/net'
-import type { TrustedEvent } from '@welshman/util'
+import { initEngine, destroyEngine, getPool, getTracker } from './engine'
 
 let initialized = false
-let pool: Pool | null = null
-let tracker: Tracker | null = null
 
 /**
  * Initialize welshman for Node.js environments.
@@ -14,32 +12,19 @@ let tracker: Tracker | null = null
  */
 export function initNodeEngine(): void {
   if (initialized) return
-
-  // Create pool (uses WebSocket, works in Node via ws polyfill)
-  pool = new Pool({})
-  tracker = new Tracker()
-
-  // Configure net context for request/publish
-  netContext.pool = pool
-  netContext.isEventValid = (_event: TrustedEvent, _url: string) => true
-  netContext.isEventDeleted = () => false
-
+  initEngine({ nodeMode: true })
   initialized = true
 }
 
-export function getNodePool(): Pool | null {
-  if (!initialized) initNodeEngine()
-  return pool
+export function getNodePool() {
+  return getPool()
 }
 
-export function getNodeTracker(): Tracker | null {
-  if (!initialized) initNodeEngine()
-  return tracker
+export function getNodeTracker() {
+  return getTracker()
 }
 
 export function destroyNodeEngine(): void {
-  if (!initialized) return
-  pool?.clear()
-  tracker?.clear()
+  destroyEngine()
   initialized = false
 }

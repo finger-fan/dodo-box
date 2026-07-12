@@ -20,8 +20,16 @@ export type MessageCallback = (msg: ReceivedMessage) => void
  */
 function parseInnerEvent(event: SignedEvent): ReceivedMessage | null {
   try {
-    const data = JSON.parse(event.content)
-    const text = typeof data === 'string' ? data : data.text || ''
+    // Try to parse as JSON first (newer format)
+    let text: string
+    try {
+      const data = JSON.parse(event.content)
+      text = typeof data === 'string' ? data : data.text || data.content || ''
+    } catch {
+      // Fallback: treat as plain text (older format or direct string)
+      text = event.content
+    }
+
     if (!text) return null
 
     const tags = event.tags
@@ -36,8 +44,8 @@ function parseInnerEvent(event: SignedEvent): ReceivedMessage | null {
       timestamp: new Date(event.created_at * 1000),
       seq,
     }
-  } catch {
-    console.warn('[receiver] Failed to parse inner event:', event.content)
+  } catch (err) {
+    console.error('[receiver] Failed to parse inner event:', err, event)
     return null
   }
 }
@@ -61,7 +69,14 @@ export function startReceiving(
     limit: 20,
   }]
 
+  // Deduplicate events by ID to prevent processing the same message multiple times
+  const seenEventIds = new Set<string>()
+
   const controller = subscribe(filters, relayUrls, async (event: TrustedEvent) => {
+    // Deduplicate by event ID
+    if (seenEventIds.has(event.id)) return
+    seenEventIds.add(event.id)
+
     const signedEvent = event as unknown as SignedEvent
 
     // Decrypt the gift wrap
