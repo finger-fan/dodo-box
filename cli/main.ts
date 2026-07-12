@@ -1,6 +1,6 @@
 // main.ts — DodoBox CLI: walkie-talkie style Nostr messaging
 
-import { connectRelays, getStatus, getDefaultRelays } from '../lib/messaging/relay-node'
+import { connectRelays, getStatus, getDefaultRelays } from './relay'
 import { createSession, serializeSession } from '../lib/messaging/session'
 import { sendDirectMessage } from '../lib/messaging/sender'
 import { startReceiving } from '../lib/messaging/receiver'
