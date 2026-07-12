@@ -1,7 +1,7 @@
 // profile.ts — Profile fetching and caching for CLI
 // Fetches Nostr profiles (kind:0) from relays
 
-import { fetchEvents } from '../lib/messaging/relay-node'
+import { fetchEvents } from './relay-node'
 import type { Filter, SignedEvent } from '@welshman/util'
 
 export interface NostrProfile {

@@ -62,7 +62,7 @@ export function startReceiving(
   }]
 
   const controller = subscribe(filters, relayUrls, async (event: TrustedEvent) => {
-    const signedEvent = event.event as SignedEvent
+    const signedEvent = event as unknown as SignedEvent
 
     // Decrypt the gift wrap
     const inner = await decryptGiftWrap(signedEvent, myPrivkey)

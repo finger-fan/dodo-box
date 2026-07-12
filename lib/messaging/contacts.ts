@@ -1,7 +1,7 @@
 // contacts.ts — Contact management for CLI
 // Handles adding/removing contacts, npub decoding, profile lookup
 
-import { fetchEvents } from '../lib/messaging/relay-node'
+import { fetchEvents } from './relay-node'
 import { decryptGiftWrap } from '@/lib/welshman/crypto'
 import type { Filter, SignedEvent } from '@welshman/util'
 

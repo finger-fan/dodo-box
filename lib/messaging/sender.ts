@@ -46,8 +46,8 @@ export async function sendDirectMessage(
     const results = await publishEvent(wrapForRecipient, relayUrls, { timeout: 10000 })
 
     // Count successful relays
-    const successCount = Object.values(results).filter(
-      (r) => r.status === 'published'
+    successCount = Object.values(results).filter(
+      (r: { status: string }) => r.status === 'published'
     ).length
 
     return {
