@@ -47,7 +47,7 @@ export async function sendDirectMessage(
 
     // Count successful relays
     const successCount = Object.values(results).filter(
-      (r) => r.status === 'published'
+      (r) => (r as any).status === 'published'
     ).length
 
     return {
