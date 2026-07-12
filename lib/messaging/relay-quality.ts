@@ -54,7 +54,7 @@ export async function testRelayQuality(
     const { buildDirectMessageEvent } = await import('@/lib/welshman/crypto')
     const testEvent = buildDirectMessageEvent(
       `dodobox-cli-test-${Date.now()}`,
-      testPrivkey, // use self as recipient for test
+      testPrivkey,
       testPrivkey
     ) as SignedEvent
 
