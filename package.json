@@ -35,7 +35,8 @@
     "cap:bundle": "node scripts/cap-bundle.js",
     "cap:upload": "bash scripts/cap-upload.sh",
     "cap:open": "npx cap open android",
-    "cap:deploy": "bash scripts/cap-deploy.sh"
+    "cap:deploy": "bash scripts/cap-deploy.sh",
+    "cli": "npx tsx cli/main.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.2.0",
