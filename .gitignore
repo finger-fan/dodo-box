@@ -6,9 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Test artifacts (generated, not for VCS)
 playwright-report/
 test-results/
 tests/e2e/screenshots/
+
+# TypeScript incremental build cache
 tsconfig.tsbuildinfo
 root_claude_settings
 
