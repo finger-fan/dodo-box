@@ -147,8 +147,15 @@ export class RealNostrAdapter implements INostrAdapter {
 
     try {
       const seq = incrementSeqCounter(this.session.currentPubkey, contactPubkey)
+
+      // Get TTL from localStorage (set in Settings page), fallback to env var
+      const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null
+      const envTtl = process.env.NEXT_PUBLIC_DEFAULT_MESSAGE_TTL
+      const ttl = savedTtl ? parseInt(savedTtl, 10) : (envTtl ? parseInt(envTtl, 10) : 0)
+      const expiration = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : undefined
+
       // Use JSON format { text: "..." } to match CLI format
-      const innerEvent = buildDirectMessageEvent(JSON.stringify({ text }), contactPubkey, this.privkey, seq)
+      const innerEvent = buildDirectMessageEvent(JSON.stringify({ text }), contactPubkey, this.privkey, seq, expiration)
 
       // Two gift wraps: one for recipient, one for sender
       const wrapForRecipient = await createGiftWrap(innerEvent, contactPubkey, this.privkey)

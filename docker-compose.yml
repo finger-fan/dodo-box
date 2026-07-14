@@ -9,6 +9,8 @@ services:
       - relay-data:/app/strfry-db
       - ./docker/strfry.conf:/app/strfry.conf:ro
     command: ["--config", "/app/strfry.conf", "relay"]
+    environment:
+      - TZ=Asia/Shanghai
     deploy:
       resources:
         limits:
@@ -42,6 +44,8 @@ services:
       - NEXT_PUBLIC_MOCK_TELEGRAM_TOKEN=mock-bot-token-12345
       - MOCK_BOT_USERNAME=dodobox_bot
       - MOCK_BOT_FIRST_NAME=DodoBox Bot
+      # Default message TTL in seconds (0 = permanent, 86400 = 1 day, 2592000 = 30 days)
+      - DEFAULT_MESSAGE_TTL=${DEFAULT_MESSAGE_TTL:-0}
     deploy:
       resources:
         limits:
