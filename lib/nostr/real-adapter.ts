@@ -103,9 +103,20 @@ export class RealNostrAdapter implements INostrAdapter {
 
       if (!isFromContact && !isFromMe) continue
 
+      // Parse JSON format { text: "..." } from CLI, fallback to raw content
+      let messageText = innerEvent.content
+      try {
+        const parsed = JSON.parse(innerEvent.content)
+        if (parsed && typeof parsed.text === 'string') {
+          messageText = parsed.text
+        }
+      } catch {
+        // Not JSON, use raw content
+      }
+
       messages.push({
         id: innerEvent.id,
-        text: innerEvent.content,
+        text: messageText,
         sender: isFromMe ? 'me' : 'them',
         timestamp: new Date(innerEvent.created_at * 1000),
         senderPubkey: innerEvent.pubkey,
@@ -136,7 +147,8 @@ export class RealNostrAdapter implements INostrAdapter {
 
     try {
       const seq = incrementSeqCounter(this.session.currentPubkey, contactPubkey)
-      const innerEvent = buildDirectMessageEvent(text, contactPubkey, this.privkey, seq)
+      // Use JSON format { text: "..." } to match CLI format
+      const innerEvent = buildDirectMessageEvent(JSON.stringify({ text }), contactPubkey, this.privkey, seq)
 
       // Two gift wraps: one for recipient, one for sender
       const wrapForRecipient = await createGiftWrap(innerEvent, contactPubkey, this.privkey)
@@ -196,9 +208,20 @@ export class RealNostrAdapter implements INostrAdapter {
         const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
         if (!innerEvent || innerEvent.pubkey !== contactPubkey) return
 
+        // Parse JSON format { text: "..." } from CLI, fallback to raw content
+        let messageText = innerEvent.content
+        try {
+          const parsed = JSON.parse(innerEvent.content)
+          if (parsed && typeof parsed.text === 'string') {
+            messageText = parsed.text
+          }
+        } catch {
+          // Not JSON, use raw content
+        }
+
         callback({
           id: innerEvent.id,
-          text: innerEvent.content,
+          text: messageText,
           sender: 'them',
           timestamp: new Date(innerEvent.created_at * 1000),
           senderPubkey: innerEvent.pubkey,
@@ -468,9 +491,20 @@ export class RealNostrAdapter implements INostrAdapter {
 
       if (!isFromContact && !isFromMe) continue
 
+      // Parse JSON format { text: "..." } from CLI, fallback to raw content
+      let messageText = innerEvent.content
+      try {
+        const parsed = JSON.parse(innerEvent.content)
+        if (parsed && typeof parsed.text === 'string') {
+          messageText = parsed.text
+        }
+      } catch {
+        // Not JSON, use raw content
+      }
+
       messages.push({
         id: innerEvent.id,
-        text: innerEvent.content,
+        text: messageText,
         sender: isFromMe ? 'me' : 'them',
         timestamp: new Date(innerEvent.created_at * 1000),
         senderPubkey: innerEvent.pubkey,

@@ -5,6 +5,7 @@ import { fetchEvents, publishEvent } from './relay-node'
 import { decryptGiftWrap } from '@/lib/welshman/crypto'
 import { buildFollowListEvent } from '@/lib/welshman/crypto'
 import type { Filter, SignedEvent } from '@welshman/util'
+import { decode } from 'nostr-tools/nip19'
 
 export interface CliContact {
   pubkey: string
@@ -12,32 +13,18 @@ export interface CliContact {
 }
 
 /**
- * Decode a base32 npub to hex pubkey (NIP-19).
+ * Decode a NIP-19 npub to hex pubkey.
+ * Uses nostr-tools/nip19 for proper Bech32 decoding.
  */
 export function decodeNpub(npub: string): string | null {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567'
-
-  if (!npub.startsWith('npub1')) return null
-
-  const data = npub.slice(5)
-
-  let bits = ''
-  for (const ch of data.toLowerCase()) {
-    const idx = alphabet.indexOf(ch)
-    if (idx === -1) return null
-    bits += idx.toString(2).padStart(5, '0')
+  try {
+    if (!npub.startsWith('npub1')) return null
+    const decoded = decode(npub)
+    if (decoded.type === 'npub') return decoded.data as string
+    return null
+  } catch {
+    return null
   }
-
-  const hexBytes = bits.slice(0, 256)
-  if (hexBytes.length < 256) return null
-
-  let hex = ''
-  for (let i = 0; i < 256; i += 8) {
-    const byte = hexBytes.slice(i, i + 8)
-    hex += parseInt(byte, 2).toString(16).padStart(2, '0')
-  }
-
-  return hex
 }
 
 /**
@@ -188,6 +175,8 @@ export function findContact(
 /**
  * Fetch recent messages from a specific contact from relay.
  * Decrypts gift wrap messages and returns the last N messages.
+ * Note: NIP-59 gift wraps are authored by ephemeral keys, so we cannot
+ * filter by author. We fetch by kind/`#p` and filter after decryption.
  */
 export async function fetchRecentMessages(
   myPubkey: string,
@@ -199,7 +188,6 @@ export async function fetchRecentMessages(
   const filter: Filter = {
     kinds: [1059],
     '#p': [myPubkey],
-    authors: [contactPubkey],
     limit: limit * 2, // fetch more to account for undecryptable messages
   }
 
@@ -213,11 +201,25 @@ export async function fetchRecentMessages(
       const decrypted = await decryptGiftWrap(signedEvent, myPrivkey)
       if (!decrypted) continue
 
+      // Filter: only include messages from the specified contact
+      if (decrypted.pubkey !== contactPubkey) continue
+
+      // Parse JSON format { text: "..." } from CLI
+      let messageText = decrypted.content
+      try {
+        const parsed = JSON.parse(decrypted.content)
+        if (parsed && typeof parsed.text === 'string') {
+          messageText = parsed.text
+        }
+      } catch {
+        // Not JSON, use raw content
+      }
+
       messages.push({
         id: decrypted.id,
-        text: decrypted.content,
+        text: messageText,
         timestamp: new Date(decrypted.created_at * 1000),
-        senderPubkey: contactPubkey,
+        senderPubkey: decrypted.pubkey,
       })
 
       if (messages.length >= limit) break
