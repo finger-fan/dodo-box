@@ -10,7 +10,7 @@ export function useChats() {
   const [chats, setChats] = useState<NostrChat[]>(() =>
     session.currentPubkey ? loadCachedChats(session.currentPubkey) : []
   )
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(session.isAuthenticated)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {

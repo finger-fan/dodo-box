@@ -11,6 +11,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "copy": "Copy",
+    "share": "Share",
     "new": "New",
     "logout": "Logout Session"
   },
@@ -30,6 +31,8 @@
     "clear": "Clear",
     "identities": "Identities",
     "active_identity": "Active Identity",
+    "account_only": "Account",
+    "no_identity_hint": "Create an identity to start messaging",
     "switch_identity": "Switch Identity",
     "new_identity": "New Identity",
     "edit_identity": "Edit Identity",
@@ -58,6 +61,7 @@
     "add_contact": "Add Contact",
     "search_contacts": "Search contacts...",
     "no_contacts": "No contacts found",
+    "loading": "Updating contacts…",
     "remove_contact": "Remove Contact",
     "remove_confirm": "Are you sure you want to remove this contact? This action cannot be undone.",
     "edit_nickname": "Edit Nickname",
@@ -104,6 +108,7 @@
   },
   "messages": {
     "no_chats": "No chats yet",
+    "loading_chats": "Updating contacts…",
     "add_contact_prompt": "Add a contact to start chatting",
     "add_contact": "Add Contact"
   },

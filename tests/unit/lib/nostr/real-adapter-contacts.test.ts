@@ -134,6 +134,20 @@ describe('RealNostrAdapter.addContact', () => {
     vi.clearAllMocks()
   })
 
+  it('returns updated contacts when getContacts is called again after addContact', async () => {
+    // Regression: contacts page remount must not receive the stale cached
+    // fetch promise (which resolved to the pre-add empty list).
+    mockFetchEvents.mockResolvedValue([])
+
+    const adapter = createAdapter()
+    expect(await adapter.getContacts()).toEqual([])
+
+    await adapter.addContact(CONTACT_PUBKEY)
+
+    const contacts = await adapter.getContacts()
+    expect(contacts.some(c => c.pubkey === CONTACT_PUBKEY)).toBe(true)
+  })
+
   it('adds contact with hex pubkey', async () => {
     const adapter = createAdapter()
     const result = await adapter.addContact(CONTACT_PUBKEY)

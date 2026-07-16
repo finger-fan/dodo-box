@@ -31,11 +31,7 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
   const identities = session.vaultData?.identities || [];
   const activeIdentity = identities.find(i => i.pubkey === session.currentPubkey);
 
-  const activeDisplay = activeIdentity
-    ? activeIdentity.name
-    : session.currentPubkey
-    ? shortPubkey(session.currentPubkey)
-    : 'No identity';
+  const accountDisplay = session.username || t('settings.account_only', 'Account');
 
   const handleSwitchIdentity = async (pubkey: string) => {
     const result = await switchIdentity(pubkey);
@@ -129,31 +125,17 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
                 <div className="relative z-10 flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">
-                      {activeIdentity ? t('settings.active_identity') : t('settings.account_only', 'Account')}
+                      {t('settings.account_only', 'Account')}
                     </div>
-                    <h3 className="identity-hero-name text-3xl font-display font-bold">{activeDisplay}</h3>
+                    <h3 className="identity-hero-name text-3xl font-display font-bold">{accountDisplay}</h3>
                     {activeIdentity && session.currentPubkey && (
-                      <div className="text-xs font-mono opacity-60">{shortPubkey(session.currentPubkey)}</div>
+                      <div className="text-xs opacity-60 mt-1">
+                        {t('settings.active_identity')}: {activeIdentity.name} <span className="font-mono">{shortPubkey(session.currentPubkey)}</span>
+                      </div>
                     )}
                     {!activeIdentity && (
                       <div className="text-xs opacity-60 mt-1">{t('settings.no_identity_hint', 'Create an identity to start messaging')}</div>
                     )}
-                  </div>
-                  <div className="flex gap-2">
-                    {activeIdentity && session.currentPubkey && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(encodeIdentityInfo(session.currentPubkey!, activeIdentity!.name));
-                          onToast(t('common.copy_success'), 'success');
-                        }}
-                        className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl backdrop-blur-md transition-colors"
-                      >
-                        <Share2 className="w-5 h-5" />
-                      </button>
-                    )}
-                    <button disabled title={t('common.coming_soon', 'Coming soon')} className="p-3 bg-white/20 rounded-2xl backdrop-blur-md opacity-40 cursor-not-allowed">
-                      <QrCode className="w-5 h-5" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -190,31 +172,49 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
                         ]}
                         className="rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden"
                       >
-                        <button
-                          onClick={() => handleSwitchIdentity(identity.pubkey)}
+                        <div
                           className={cn(
-                            "w-full flex items-center gap-4 p-4 transition-all",
+                            "w-full flex items-center gap-1 p-4 transition-all",
                             isActive ? "active bg-emerald-50/50 dark:bg-emerald-900/10" : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                           )}
                         >
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                            isActive ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
-                          )}>
-                            <Shield className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <span className={cn("font-bold block", isActive ? "text-emerald-900 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>
-                              {identity.name}
-                            </span>
-                            <span className="text-[10px] font-mono text-zinc-400 truncate block">{shortPubkey(identity.pubkey)}</span>
-                          </div>
-                          {isActive && (
-                            <div className="ml-auto w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center">
-                              <Check className="w-3.5 h-3.5 text-white" />
+                          <button
+                            onClick={() => handleSwitchIdentity(identity.pubkey)}
+                            className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                          >
+                            <div className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0",
+                              isActive ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
+                            )}>
+                              <Shield className="w-5 h-5" />
                             </div>
-                          )}
-                        </button>
+                            <div className="flex-1 min-w-0 text-left">
+                              <span className={cn("font-bold block", isActive ? "text-emerald-900 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>
+                                {identity.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-zinc-400 truncate block">{shortPubkey(identity.pubkey)}</span>
+                            </div>
+                            {isActive && (
+                              <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center shrink-0">
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              </div>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleCopyIdentity(identity.pubkey, identity.name)}
+                            title={t('common.share', 'Share')}
+                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-colors shrink-0"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            disabled
+                            title={t('settings.coming_soon')}
+                            className="p-2 text-zinc-300 dark:text-zinc-600 rounded-xl opacity-60 cursor-not-allowed shrink-0"
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                        </div>
                       </SwipeableListItem>
                     );
                   })}

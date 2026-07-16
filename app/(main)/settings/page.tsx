@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import Toast from '@/components/ui/Toast';
 import IdentityModal from '@/components/settings/IdentityModal';
 import GeneralSettings from '@/components/settings/GeneralSettings';
-import { cn, shortPubkey } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
@@ -88,11 +88,7 @@ export default function SettingsPage() {
 
   if (!mounted) return null;
 
-  const activeDisplay = activeIdentity
-    ? activeIdentity.name
-    : session.currentPubkey
-    ? shortPubkey(session.currentPubkey)
-    : 'No identity';
+  const accountDisplay = session.username || t('settings.account_only', 'Account');
 
   return (
     <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -112,8 +108,10 @@ export default function SettingsPage() {
               <UserCircle className="w-7 h-7" />
             </div>
             <div className="text-left flex-1">
-              <div className="font-bold text-zinc-900 dark:text-zinc-100">{activeDisplay}</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">{t('settings.switch_identity')}</div>
+              <div className="font-bold text-zinc-900 dark:text-zinc-100">{accountDisplay}</div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                {activeIdentity ? `${t('settings.active_identity')}: ${activeIdentity.name}` : t('settings.switch_identity')}
+              </div>
             </div>
             <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
           </button>

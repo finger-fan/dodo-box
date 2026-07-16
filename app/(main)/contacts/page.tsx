@@ -16,7 +16,7 @@ import { defaultAvatar } from '@/lib/utils';
 export default function ContactsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { contacts, addContact, removeContact } = useContacts();
+  const { contacts, isLoading, addContact, removeContact } = useContacts();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [contactInput, setContactInput] = useState('');
@@ -106,7 +106,11 @@ export default function ContactsPage() {
 
       {/* List */}
       <div className="contacts-container flex-1 overflow-y-auto">
-        {filteredContacts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-64 text-zinc-400 space-y-2">
+            <p className="text-sm">{t('contacts.loading')}</p>
+          </div>
+        ) : filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-zinc-400 space-y-2">
             <Users className="w-12 h-12 opacity-20" />
             <p className="text-sm">{t('contacts.no_contacts')}</p>

@@ -10,7 +10,7 @@ import { useMounted } from '@/hooks/use-mounted';
 export default function MessagesPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { chats } = useChats();
+  const { chats, isLoading } = useChats();
   const mounted = useMounted();
 
   if (!mounted) return null;
@@ -25,7 +25,11 @@ export default function MessagesPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        {chats.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+            <p className="text-sm text-zinc-400">{t('messages.loading_chats')}</p>
+          </div>
+        ) : chats.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-8 text-center space-y-4">
             <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center">
               <Search className="w-8 h-8 text-zinc-400" />
@@ -34,12 +38,6 @@ export default function MessagesPage() {
               <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t('messages.no_chats')}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t('messages.add_contact_prompt')}</p>
             </div>
-            <button
-              onClick={() => router.push('/contacts')}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm transition-colors"
-            >
-              {t('messages.add_contact')}
-            </button>
           </div>
         ) : (
           chats.map((chat) => (

@@ -267,7 +267,13 @@ export class RealNostrAdapter implements INostrAdapter {
   }
 
   async getContacts(): Promise<NostrContact[]> {
-    if (this.contactsFetchPromise) return this.contactsFetchPromise
+    // The cached promise only dedupes the initial relay fetch. Always return
+    // current state so later add/remove mutations stay visible to callers
+    // (e.g. the contacts page remounting after a chat was opened).
+    if (this.contactsFetchPromise) {
+      await this.contactsFetchPromise
+      return [...this.contacts]
+    }
 
     if (!this.session.currentPubkey) return []
 
@@ -341,7 +347,8 @@ export class RealNostrAdapter implements INostrAdapter {
       return this.contacts
     })
 
-    return this.contactsFetchPromise
+    await this.contactsFetchPromise
+    return [...this.contacts]
   }
 
   private rebuildChats(): void {
@@ -402,8 +409,21 @@ export class RealNostrAdapter implements INostrAdapter {
     }
 
     this.contacts = [...this.contacts, newContact]
+    this.chats = [
+      ...this.chats,
+      {
+        id: newContact.id,
+        pubkey,
+        name: newContact.name,
+        lastMsg: '',
+        time: '',
+        unread: 0,
+        avatar: newContact.avatar || '',
+      },
+    ]
     if (this.session.currentPubkey) {
       saveCachedContacts(this.session.currentPubkey, this.contacts)
+      saveCachedChats(this.session.currentPubkey, this.chats)
     }
 
     // Publish new kind 3 follows list with petnames (only real nicknames, not shortPubkey)
