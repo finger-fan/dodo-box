@@ -1,6 +1,6 @@
 {
   "name": "dodo-box",
-  "version": "0.8.0",
+  "version": "0.8.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,15 +26,28 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "test:all": "pnpm test && pnpm test:e2e"
+    "test:all": "pnpm test && pnpm test:e2e",
+    "cap:export": "node scripts/cap-build-export.js",
+    "cap:sync": "npx cap sync android",
+    "cap:build": "pnpm cap:export && pnpm cap:sync",
+    "cap:apk:debug": "pnpm cap:build && cd android && ./gradlew assembleDebug",
+    "cap:apk:release": "pnpm cap:build && cd android && ./gradlew assembleRelease",
+    "cap:bundle": "node scripts/cap-bundle.js",
+    "cap:upload": "bash scripts/cap-upload.sh",
+    "cap:open": "npx cap open android",
+    "cap:deploy": "bash scripts/cap-deploy.sh",
+    "cli": "npx tsx cli/main.ts"
   },
   "dependencies": {
-    "@google/genai": "^1.17.0",
-    "@hookform/resolvers": "^5.2.1",
+    "@capacitor/core": "^8.2.0",
+    "@capgo/capacitor-updater": "^8.43.11",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
+    "@welshman/lib": "^0.8.9",
+    "@welshman/net": "^0.8.9",
+    "@welshman/signer": "^0.8.9",
+    "@welshman/util": "^0.8.9",
     "autoprefixer": "^10.4.21",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "i18next": "^25.8.18",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -50,6 +63,8 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "4.1.11",
     "@tailwindcss/typography": "^0.5.19",

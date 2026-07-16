@@ -1,7 +1,6 @@
 // types.ts - Nostr 相关类型定义
 
 export const VAULT_SALT = process.env.NEXT_PUBLIC_VAULT_SALT || 'dodobox-vault-v1'
-export const VAULT_EVENT_KIND = 31990
 export const VAULT_EVENT_D_TAG = 'doracle-vault'
 
 export const KIND_PROFILE = 0
@@ -31,12 +30,16 @@ export interface DerivedKey {
   nsec: string
 }
 
+export type DeliveryStatus = 'pending' | 'sent' | 'failed'
+
 export interface NostrMessage {
   id: string
   text: string
   sender: 'me' | 'them'
   timestamp: Date
   senderPubkey?: string
+  seq?: number
+  sendStatus?: DeliveryStatus
 }
 
 export interface NostrChat {
@@ -76,16 +79,15 @@ export type NostrResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-export interface NostrFilter {
+export type NostrFilter = {
   ids?: string[]
   authors?: string[]
   kinds?: number[]
   since?: number
   until?: number
   limit?: number
-  '#p'?: string[]
-  '#d'?: string[]
-  '#e'?: string[]
+  search?: string
+  [key: `#${string}`]: string[]
 }
 
 export interface NostrEvent {
@@ -113,6 +115,11 @@ export interface INostrAdapter {
   updateProfile(profile: Partial<NostrProfile>): Promise<NostrResult>
   getRelays(): string[]
   setRelays(relays: string[]): Promise<NostrResult>
+  recoverMessages(
+    contactPubkey: string,
+    since: number,
+    until: number
+  ): Promise<NostrMessage[]>
 }
 
 export const VAULT_ERROR_CODES = {

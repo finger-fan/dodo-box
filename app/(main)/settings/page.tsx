@@ -1,44 +1,56 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCircle, LogOut, Globe, Moon, Shield,
-  Trash2, Download, ChevronRight, Plus,
-  Share2, QrCode, Edit2, X, Check, Clock, ChevronLeft
+  UserCircle, LogOut, Shield,
+  Trash2, Download, ChevronRight, Clock,
+  RefreshCw, RotateCcw, Loader2,
+  Server,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from 'next-themes';
-import SwipeableListItem from '@/components/ui/SwipeableListItem';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
-import { cn, encodeIdentityInfo, shortPubkey } from '@/lib/utils';
+import IdentityModal from '@/components/settings/IdentityModal';
+import GeneralSettings from '@/components/settings/GeneralSettings';
+import { cn, shortPubkey } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
-import type { VaultIdentity } from '@/lib/nostr/types';
+import { useMounted } from '@/hooks/use-mounted';
+import { useUpdater } from '@/hooks/use-updater';
+import { Capacitor } from '@capacitor/core';
+import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
+import type { AdapterMode } from '@/lib/nostr';
+
+const TTL_OPTIONS = [
+  { value: 600, labelKey: 'settings.ttl_10min' },
+  { value: 1800, labelKey: 'settings.ttl_30min' },
+  { value: 3600, labelKey: 'settings.ttl_1hour' },
+  { value: 86400, labelKey: 'settings.ttl_1day' },
+  { value: 1296000, labelKey: 'settings.ttl_15days' },
+  { value: 2592000, labelKey: 'settings.ttl_30days' },
+  { value: 0, labelKey: 'settings.ttl_permanent' },
+];
 
 export default function SettingsPage() {
-  const { t, i18n } = useTranslation();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
-  const { session, logout, switchIdentity, createIdentity, deleteIdentity, updateIdentityName, adapter } = useNostr();
+  const { session, adapterMode, setAdapterMode, logout } = useNostr();
 
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingIdentity, setEditingIdentity] = useState<VaultIdentity | null>(null);
-  const [newIdentityName, setNewIdentityName] = useState('');
-  const [mounted, setMounted] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const mounted = useMounted();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [relays, setRelays] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [messageTtl, setMessageTtl] = useState(() => {
+    try {
+      const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null;
+      return savedTtl ? Number(savedTtl) : 2592000;
+    } catch {
+      return 2592000;
+    }
+  });
+  const [isTtlOpen, setIsTtlOpen] = useState(false);
+  const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
 
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-      setRelays(adapter.getRelays());
-    });
-  }, [adapter]);
+  const updater = useUpdater();
+  const isNative = mounted && Capacitor.isNativePlatform();
 
   const identities = session.vaultData?.identities || [];
   const activeIdentity = identities.find(i => i.pubkey === session.currentPubkey);
@@ -48,62 +60,30 @@ export default function SettingsPage() {
     router.push('/login');
   };
 
-  const handleSwitchIdentity = async (pubkey: string) => {
-    const result = await switchIdentity(pubkey);
-    if (result.success) {
-      setToast({ message: `Switched identity`, type: 'success' });
-    } else {
-      setToast({ message: result.error || 'Switch failed', type: 'error' });
+  const handleTtlChange = (value: number) => {
+    setMessageTtl(value);
+    try {
+      localStorage.setItem('dodobox_message_ttl', String(value));
+    } catch (err) {
+      console.warn('[Settings] Failed to save message TTL to localStorage:', err);
     }
+    setIsTtlOpen(false);
   };
 
-  const handleDeleteIdentity = async (pubkey: string) => {
-    const result = await deleteIdentity(pubkey);
-    setConfirmDelete(null);
-    if (result.success) {
-      setToast({ message: 'Identity deleted', type: 'success' });
+  const currentTtlLabel = TTL_OPTIONS.find(o => o.value === messageTtl)?.labelKey || 'settings.ttl_30days';
+
+  const handleToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  const handleAdapterModeChange = (mode: AdapterMode) => {
+    setAdapterMode(mode);
+    // After switching, redirect to login for real mode, or stay for mock
+    if (mode === 'mock-telegram') {
+      handleToast('Switched to Telegram Mock mode', 'success');
     } else {
-      setToast({ message: result.error || 'Delete failed', type: 'error' });
+      handleToast('Switched to Nostr Real mode — please login again', 'success');
     }
-  };
-
-  const handleCreateIdentity = async () => {
-    if (!newIdentityName.trim()) return;
-    setIsLoading(true);
-    const result = await createIdentity(newIdentityName.trim());
-    setIsLoading(false);
-    if (result.success) {
-      setNewIdentityName('');
-      setIsEditModalOpen(false);
-      setToast({ message: t('settings.new_identity_created', 'New identity created'), type: 'success' });
-    } else {
-      setToast({ message: result.error || 'Failed to create', type: 'error' });
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingIdentity || !newIdentityName.trim()) return;
-    setIsLoading(true);
-    const result = await updateIdentityName(editingIdentity.pubkey, newIdentityName.trim());
-    setIsLoading(false);
-    if (result.success) {
-      setEditingIdentity(null);
-      setNewIdentityName('');
-      setIsEditModalOpen(false);
-      setToast({ message: t('settings.identity_updated', 'Identity updated'), type: 'success' });
-    } else {
-      setToast({ message: result.error || 'Update failed', type: 'error' });
-    }
-  };
-
-  const handleCopyIdentity = (pubkey: string) => {
-    const identityStr = encodeIdentityInfo(pubkey);
-    navigator.clipboard.writeText(identityStr);
-    setToast({ message: t('common.copy_success', 'Identity copied for sharing'), type: 'success' });
-  };
-
-  const handleLanguageChange = (lang: string) => {
-    i18n.changeLanguage(lang);
   };
 
   if (!mounted) return null;
@@ -150,278 +130,160 @@ export default function SettingsPage() {
         {/* Preferences */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.preferences')}</div>
+          <GeneralSettings onToast={handleToast} />
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <div className="lang-switcher flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
+            <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <Globe className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.language')}</span>
+                <Shield className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.contact_cache')}</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.contact_cache_desc')}</p>
+                </div>
               </div>
-              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button
-                  onClick={() => handleLanguageChange('en')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    i18n.language === 'en' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >EN</button>
-                <button
-                  onClick={() => handleLanguageChange('zh')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    i18n.language === 'zh' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >ZH</button>
-              </div>
+              <button
+                onClick={() => {
+                  const next = !cacheEnabled;
+                  setContactCacheEnabled(next);
+                  setCacheEnabled(next);
+                }}
+                className={cn(
+                  "relative w-10 h-6 rounded-full transition-colors",
+                  cacheEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  cacheEnabled ? "left-[18px]" : "left-0.5"
+                )} />
+              </button>
             </div>
-            <div className="theme-menu flex items-center justify-between p-4">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
               <div className="flex items-center gap-3">
-                <Moon className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.theme')}</span>
+                <Server className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Connection Mode</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">
+                    {adapterMode === 'mock-telegram' ? 'Using Mock Telegram' : 'Using Nostr Relays'}
+                  </p>
+                </div>
               </div>
               <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button onClick={() => setTheme('light')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'light' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.light')}</button>
-                <button onClick={() => setTheme('system')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", theme === 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.system')}</button>
-                <button onClick={() => setTheme('dark')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'dark' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.dark')}</button>
+                <button
+                  onClick={() => handleAdapterModeChange('real')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'real' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Nostr</button>
+                <button
+                  onClick={() => handleAdapterModeChange('mock-telegram')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'mock-telegram' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Mock</button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Network & Relays */}
+        {/* Network & Data */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.network_data')}</div>
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <div className="relay-list p-4 border-b border-zinc-50 dark:border-zinc-800">
-              <div className="flex items-center justify-between mb-3">
+            <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-zinc-400" />
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.relays')}</span>
+                  <Clock className="w-5 h-5 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.message_ttl')}</span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded uppercase">{relays.length} Configured</span>
+                <button
+                  onClick={() => setIsTtlOpen(!isTtlOpen)}
+                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                >
+                  {t(currentTtlLabel)}
+                </button>
               </div>
-              <div className="space-y-2">
-                {relays.map((relay) => (
-                  <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
-                    <span>{relay}</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.message_ttl')}</span>
-              </div>
-              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">30 Days</span>
+              {isTtlOpen && (
+                <div className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                  {TTL_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleTtlChange(option.value)}
+                      className={cn(
+                        "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                        messageTtl === option.value
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold"
+                          : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                      )}
+                    >
+                      {t(option.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="p-4 flex gap-2">
-              <button className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+              <button disabled title={t('settings.coming_soon')} className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 <Download className="w-4 h-4" /> {t('settings.export')}
               </button>
-              <button className="btn-danger flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
+              <button disabled title={t('settings.coming_soon')} className="btn-danger flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 <Trash2 className="w-4 h-4" /> {t('settings.clear')}
               </button>
             </div>
           </div>
         </section>
-      </div>
 
-      {/* Identity Management Full-screen Modal */}
-      <AnimatePresence>
-        {isIdentityModalOpen && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col"
-          >
-            <header className="px-4 h-16 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setIsIdentityModalOpen(false)} className="p-2 -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-                  <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+        {/* App Update (native only) */}
+        {isNative && (
+          <section className="space-y-3">
+            <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('updater.section_title')}</div>
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-zinc-50 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-zinc-400" />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('updater.current_version')}</span>
+                      <span className="ml-2 text-xs font-mono text-zinc-500">{process.env.NEXT_PUBLIC_APP_VERSION ?? '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 flex gap-2">
+                <button
+                  onClick={updater.check}
+                  disabled={updater.checking}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+                >
+                  {updater.checking ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {t('updater.checking')}</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" /> {t('updater.check_update')}</>
+                  )}
                 </button>
-                <h2 className="header-title text-xl font-display font-bold text-zinc-900 dark:text-zinc-100">{t('settings.identities')}</h2>
+                <button
+                  onClick={updater.reset}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" /> {t('updater.reset_builtin')}
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setEditingIdentity(null);
-                  setNewIdentityName('');
-                  setIsEditModalOpen(true);
-                }}
-                className="btn-accent-pill bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg shadow-emerald-200 dark:shadow-none"
-              >
-                {t('common.new')}
-              </button>
-            </header>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Active Hero */}
-              <div className="identity-hero bg-emerald-600 rounded-[32px] p-6 text-white shadow-2xl shadow-emerald-200 dark:shadow-none relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
-                <div className="relative z-10 flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">{t('settings.active_identity')}</div>
-                    <h3 className="identity-hero-name text-3xl font-display font-bold">{activeDisplay}</h3>
-                    {session.currentPubkey && (
-                      <div className="text-xs font-mono opacity-60">{shortPubkey(session.currentPubkey)}</div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    {session.currentPubkey && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(encodeIdentityInfo(session.currentPubkey!));
-                          setToast({ message: t('common.copy_success'), type: 'success' });
-                        }}
-                        className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl backdrop-blur-md transition-colors"
-                      >
-                        <Share2 className="w-5 h-5" />
-                      </button>
-                    )}
-                    <button className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl backdrop-blur-md transition-colors">
-                      <QrCode className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Identity List */}
-              {identities.length > 0 && (
-                <div className="identity-list space-y-3">
-                  <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.switch_identity')}</div>
-                  {identities.map((identity) => {
-                    const isActive = identity.pubkey === session.currentPubkey;
-                    return (
-                      <SwipeableListItem
-                        key={identity.pubkey}
-                        actions={[
-                          {
-                            label: t('common.edit'),
-                            onClick: () => {
-                              setEditingIdentity(identity);
-                              setNewIdentityName(identity.name);
-                              setIsEditModalOpen(true);
-                            },
-                            className: 'bg-zinc-400 dark:bg-zinc-600'
-                          },
-                          {
-                            label: t('common.copy'),
-                            onClick: () => handleCopyIdentity(identity.pubkey),
-                            className: 'bg-emerald-500'
-                          },
-                          {
-                            label: t('common.delete'),
-                            onClick: () => setConfirmDelete(identity.pubkey),
-                            className: 'bg-red-500'
-                          },
-                        ]}
-                        className="rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden"
-                      >
-                        <button
-                          onClick={() => handleSwitchIdentity(identity.pubkey)}
-                          className={cn(
-                            "w-full flex items-center gap-4 p-4 transition-all",
-                            isActive ? "active bg-emerald-50/50 dark:bg-emerald-900/10" : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                            isActive ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
-                          )}>
-                            <Shield className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <span className={cn("font-bold block", isActive ? "text-emerald-900 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>
-                              {identity.name}
-                            </span>
-                            <span className="text-[10px] font-mono text-zinc-400 truncate block">{shortPubkey(identity.pubkey)}</span>
-                          </div>
-                          {isActive && (
-                            <div className="ml-auto w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center">
-                              <Check className="w-3.5 h-3.5 text-white" />
-                            </div>
-                          )}
-                        </button>
-                      </SwipeableListItem>
-                    );
-                  })}
-                </div>
-              )}
-
-              {identities.length === 0 && (
-                <div className="text-center text-zinc-400 py-8">
-                  <p className="text-sm">No identities yet. Create one to get started.</p>
+              {updater.error && (
+                <div className="px-4 pb-4">
+                  <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-2 rounded-lg">{updater.error}</div>
                 </div>
               )}
             </div>
-          </motion.div>
+          </section>
         )}
-      </AnimatePresence>
+      </div>
 
-      <ConfirmDialog
-        isOpen={!!confirmDelete}
-        title={t('settings.delete_identity', 'Delete Identity')}
-        message={t('settings.delete_confirm', 'Are you sure you want to delete this identity?')}
-        onConfirm={() => confirmDelete && handleDeleteIdentity(confirmDelete)}
-        onCancel={() => setConfirmDelete(null)}
-        confirmText={t('common.delete')}
-        cancelText={t('common.cancel')}
+      <IdentityModal
+        isOpen={isIdentityModalOpen}
+        onClose={() => setIsIdentityModalOpen(false)}
+        onToast={handleToast}
       />
-
-      {/* Identity Create/Edit Modal */}
-      <AnimatePresence>
-        {isEditModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsEditModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-xs bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-2xl"
-            >
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">
-                {editingIdentity ? t('settings.edit_identity') : t('settings.new_identity')}
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest ml-1">{t('settings.name')}</label>
-                  <input
-                    type="text"
-                    value={newIdentityName}
-                    onChange={(e) => setNewIdentityName(e.target.value)}
-                    placeholder="e.g. Work, Personal, Anon"
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    autoFocus
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => { setIsEditModalOpen(false); setEditingIdentity(null); setNewIdentityName(''); }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  onClick={editingIdentity ? handleSaveEdit : handleCreateIdentity}
-                  disabled={!newIdentityName.trim() || isLoading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-emerald-600 disabled:opacity-50"
-                >
-                  {isLoading ? '...' : (editingIdentity ? t('common.save') : t('common.create', 'Create'))}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <Toast
         isVisible={!!toast}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Camera, X, Users } from 'lucide-react';
@@ -10,6 +10,8 @@ import SwipeableListItem from '@/components/ui/SwipeableListItem';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
 import { useContacts } from '@/hooks/nostr/use-contacts';
+import { useMounted } from '@/hooks/use-mounted';
+import { defaultAvatar } from '@/lib/utils';
 
 export default function ContactsPage() {
   const { t } = useTranslation();
@@ -19,14 +21,9 @@ export default function ContactsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [contactInput, setContactInput] = useState('');
   const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [editingName, setEditingName] = useState('');
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
 
   const filteredContacts = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -53,9 +50,9 @@ export default function ContactsPage() {
       return;
     }
 
-    // Accept dodobox:// protocol or bare npub1...
-    if (!input.startsWith('dodobox://contact/') && !input.startsWith('npub1') && !input.match(/^[0-9a-f]{64}$/i)) {
-      setError(t('contacts.invalid_protocol', 'Enter a dodobox://contact/... or npub1... string'));
+    // Accept dodobox://identity/ protocol, legacy dodobox://contact/, bare npub1, or hex pubkey
+    if (!input.startsWith('dodobox://identity/') && !input.startsWith('dodobox://contact/') && !input.startsWith('npub1') && !input.match(/^[0-9a-f]{64}$/i)) {
+      setError(t('contacts.invalid_protocol', 'Paste an identity sharing string'));
       return;
     }
 
@@ -128,7 +125,7 @@ export default function ContactsPage() {
               >
                 <div className="w-12 h-12 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-800 relative">
                   <Image
-                    src={contact.avatar || `https://picsum.photos/seed/${contact.pubkey.slice(0, 8)}/100/100`}
+                    src={contact.avatar || defaultAvatar(contact.pubkey)}
                     alt={contact.name}
                     fill
                     className="object-cover"
@@ -200,7 +197,7 @@ export default function ContactsPage() {
                         setContactInput(e.target.value);
                         setError('');
                       }}
-                      placeholder="dodobox://contact/npub1... or npub1..."
+                      placeholder="dodobox://identity/npub1... or npub1..."
                       className="w-full h-32 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none text-sm font-mono"
                     />
                     <button className="btn-cam absolute right-3 bottom-3 p-2 bg-white dark:bg-zinc-700 shadow-sm border border-zinc-100 dark:border-zinc-600 rounded-xl text-zinc-400 hover:text-emerald-600 transition-colors">

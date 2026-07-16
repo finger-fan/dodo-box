@@ -15,6 +15,11 @@ export function useContacts() {
     adapter.getContacts().then((result) => {
       if (!cancelled) {
         setContacts(result)
+      }
+    }).catch((err) => {
+      console.warn('[useContacts] Failed to fetch contacts:', err)
+    }).finally(() => {
+      if (!cancelled) {
         setIsLoading(false)
       }
     })

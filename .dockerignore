@@ -7,3 +7,5 @@ node_modules
 .gitignore
 README.md
 docs/
+.env
+root_claude_settings

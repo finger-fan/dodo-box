@@ -1,4 +1,7 @@
 import type {NextConfig} from 'next';
+import packageJson from './package.json' with { type: 'json' };
+
+const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -8,19 +11,24 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Allow access to remote image placeholder.
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**', // This allows any path under the hostname
+  images: isCapacitor
+    ? { unoptimized: true }
+    : {
+        remotePatterns: [
+          {
+            protocol: 'https',
+            hostname: 'picsum.photos',
+            port: '',
+            pathname: '/**',
+          },
+        ],
       },
-    ],
+  output: isCapacitor ? 'export' : 'standalone',
+  ...(isCapacitor && { trailingSlash: true }),
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
-  output: 'standalone',
-  transpilePackages: ['motion'],
+  transpilePackages: ['motion', 'svelte', '@welshman/store'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

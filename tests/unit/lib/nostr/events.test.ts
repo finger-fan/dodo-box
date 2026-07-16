@@ -69,19 +69,23 @@ describe('buildProfileEvent', () => {
 
 describe('buildFollowListEvent', () => {
   it('builds kind 3 event', () => {
-    const event = buildFollowListEvent([RECIPIENT.publicKey], SENDER.privateKey)
+    const event = buildFollowListEvent([{ pubkey: RECIPIENT.publicKey }], SENDER.privateKey)
     expect(event.kind).toBe(KIND_FOLLOWS)
   })
 
-  it('tags each pubkey as p', () => {
-    const pubkeys = [RECIPIENT.publicKey, generateNewIdentityKey().publicKey]
-    const event = buildFollowListEvent(pubkeys, SENDER.privateKey)
+  it('tags each pubkey as p with petname', () => {
+    const pk2 = generateNewIdentityKey().publicKey
+    const contacts = [
+      { pubkey: RECIPIENT.publicKey, petname: 'Alice' },
+      { pubkey: pk2 },
+    ]
+    const event = buildFollowListEvent(contacts, SENDER.privateKey)
     expect(event.tags).toHaveLength(2)
-    expect(event.tags[0][0]).toBe('p')
-    expect(event.tags[0][1]).toBe(pubkeys[0])
+    expect(event.tags[0]).toEqual(['p', RECIPIENT.publicKey, '', 'Alice'])
+    expect(event.tags[1]).toEqual(['p', pk2, '', ''])
   })
 
-  it('handles empty pubkey list', () => {
+  it('handles empty contact list', () => {
     const event = buildFollowListEvent([], SENDER.privateKey)
     expect(event.tags).toEqual([])
   })
@@ -102,35 +106,45 @@ describe('buildDirectMessageEvent', () => {
     const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey)
     expect(event.tags[0]).toEqual(['p', RECIPIENT.publicKey])
   })
+
+  it('includes seq tag when seq is provided', () => {
+    const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey, 5)
+    expect(event.tags).toContainEqual(['seq', '5'])
+  })
+
+  it('omits seq tag when seq is undefined', () => {
+    const event = buildDirectMessageEvent('hi', RECIPIENT.publicKey, SENDER.privateKey)
+    expect(event.tags.some(t => t[0] === 'seq')).toBe(false)
+  })
 })
 
 describe('createGiftWrap / decryptGiftWrap', () => {
-  it('creates kind 1059 wrap event', () => {
+  it('creates kind 1059 wrap event', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     expect(wrap.kind).toBe(KIND_DM_WRAP)
   })
 
-  it('wrap event tags recipient pubkey', () => {
+  it('wrap event tags recipient pubkey', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     expect(wrap.tags.some(t => t[0] === 'p' && t[1] === RECIPIENT.publicKey)).toBe(true)
   })
 
-  it('decrypts gift wrap to recover inner event', () => {
+  it('decrypts gift wrap to recover inner event', async () => {
     const inner = buildDirectMessageEvent('my secret message', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
-    const decrypted = decryptGiftWrap(wrap, RECIPIENT.privateKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
+    const decrypted = await decryptGiftWrap(wrap, RECIPIENT.privateKey)
     expect(decrypted).not.toBeNull()
     expect(decrypted!.content).toBe('my secret message')
     expect(decrypted!.kind).toBe(KIND_DIRECT_MESSAGE)
   })
 
-  it('returns null when decrypting with wrong key', () => {
+  it('returns null when decrypting with wrong key', async () => {
     const inner = buildDirectMessageEvent('secret', RECIPIENT.publicKey, SENDER.privateKey)
-    const wrap = createGiftWrap(inner, RECIPIENT.publicKey)
+    const wrap = await createGiftWrap(inner, RECIPIENT.publicKey, SENDER.privateKey)
     const wrongKey = generateNewIdentityKey().privateKey
-    const result = decryptGiftWrap(wrap, wrongKey)
+    const result = await decryptGiftWrap(wrap, wrongKey)
     expect(result).toBeNull()
   })
 })

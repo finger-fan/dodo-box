@@ -1,33 +1,44 @@
-// index.ts - Nostr 适配器工厂
+// index.ts - Nostr adapter factory
 
 export * from './types'
 export * from './key-derivation'
 export * from './vault-crypto'
 export * from './vault-sync'
 export * from './events'
-export * from './mock-adapter'
+export * from './empty-adapter'
 export * from './real-adapter'
-export * from './storage'
+export * from './mock-telegram-adapter'
 
-import { MockNostrAdapter } from './mock-adapter'
+import { EmptyNostrAdapter } from './empty-adapter'
 import { RealNostrAdapter } from './real-adapter'
+import { MockTelegramAdapter } from './mock-telegram-adapter'
 import type { INostrAdapter, NostrSession } from './types'
 
-export function createNostrAdapter(session?: NostrSession): INostrAdapter {
-  if (typeof window === 'undefined') return new MockNostrAdapter()
+export type AdapterMode = 'real' | 'mock-telegram' | 'empty'
 
-  const envMock = process.env.NEXT_PUBLIC_NOSTR_MOCK
-  const localMock = localStorage.getItem('dodobox_nostr_mock')
+export function getAdapterMode(): AdapterMode {
+  if (typeof window === 'undefined') return 'empty'
+  return (localStorage.getItem('dodobox_adapter_mode') as AdapterMode) || 'real'
+}
 
-  const isMock =
-    envMock !== 'false' ||
-    (localMock !== 'false' && envMock !== 'false') ||
-    !session?.currentPubkey
+export function setAdapterMode(mode: AdapterMode) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem('dodobox_adapter_mode', mode)
+}
 
-  if (isMock) return new MockNostrAdapter()
+export function createNostrAdapter(session?: NostrSession, relayUrls?: string[]): INostrAdapter {
+  if (typeof window === 'undefined') return new EmptyNostrAdapter()
+
+  const mode = getAdapterMode()
+
+  if (mode === 'mock-telegram') {
+    return new MockTelegramAdapter()
+  }
+
+  if (!session?.currentPubkey) return new EmptyNostrAdapter()
 
   const sessionWithKey = session as NostrSession & { currentPrivkey?: string }
-  if (!sessionWithKey.currentPrivkey) return new MockNostrAdapter()
+  if (!sessionWithKey.currentPrivkey) return new EmptyNostrAdapter()
 
-  return new RealNostrAdapter(session)
+  return new RealNostrAdapter(session, relayUrls)
 }

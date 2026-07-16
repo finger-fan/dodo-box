@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dodo-box - Privacy-first messaging on Nostr</title>
+  <meta name="description" content="dodo-box is a privacy-first multi-account messaging app built on the Nostr protocol.">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/style.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2310b981' rx='20' width='100' height='100'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>D</text></svg>">
+</head>
+<body>
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="container">
+      <svg class="hero-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect fill="#10b981" rx="24" width="100" height="100"/>
+        <text x="50" y="68" font-family="Space Grotesk, sans-serif" font-size="50" font-weight="600" text-anchor="middle" fill="white">D</text>
+      </svg>
+      <h1>dodo-box</h1>
+      <p class="tagline">Privacy-first messaging on Nostr.<br>Multiple accounts, one vault.</p>
+      <a href="#download" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download APK
+      </a>
+    </div>
+  </header>
+
+  <!-- Features Section -->
+  <section id="features">
+    <div class="container">
+      <div class="section-title">
+        <h2>Features</h2>
+        <p>Built for privacy, designed for simplicity</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <h3>Vault-Based Identity</h3>
+          <p>Your private keys are encrypted and secured in a local vault. Only you have access.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">👥</div>
+          <h3>Multi-Account</h3>
+          <p>Seamlessly switch between multiple Nostr identities without juggling multiple apps.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Privacy First</h3>
+          <p>No phone number or email required. Start messaging with just a Nostr keypair.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>OTA Updates</h3>
+          <p>Get the latest features and fixes automatically without reinstalling the app.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <h3>Nostr Native</h3>
+          <p>Built on the open Nostr protocol. No central servers, no censorship.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📱</div>
+          <h3>Mobile Optimized</h3>
+          <p>Designed for mobile with a clean, intuitive interface and gesture support.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download Section -->
+  <section id="download" class="download">
+    <div class="container">
+      <div class="section-title">
+        <h2>Download</h2>
+        <p>Get the latest version for Android</p>
+      </div>
+      <div class="download-card">
+        <span class="version-badge" id="version-badge">v0.8.8</span>
+        <h3>dodo-box Android</h3>
+        <p class="download-meta" id="download-meta">Version 0.8.8 • Released 2026-03-27</p>
+        <div class="download-notes" id="download-notes">
+          <strong>Release Notes</strong>
+          <span id="release-notes-text">Initial public release</span>
+        </div>
+        <a href="apks/dodo-box-0.8.8.apk" class="btn btn-primary" id="download-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download APK
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Versions Section -->
+  <section id="versions">
+    <div class="container">
+      <div class="section-title">
+        <h2>Version History</h2>
+        <p>All releases and updates</p>
+      </div>
+      <div class="versions-table-wrapper" id="versions-container">
+        <p class="loading">Loading version history...</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>dodo-box - Privacy-first messaging on Nostr</p>
+      <p>Built with Next.js, Capacitor, and Nostr</p>
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#versions">Versions</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    // Fetch and display version data
+    async function loadVersions() {
+      const container = document.getElementById('versions-container');
+
+      try {
+        const response = await fetch('versions.json');
+        if (!response.ok) {
+          throw new Error('Failed to load versions');
+        }
+
+        const data = await response.json();
+        const releases = data.releases || [];
+
+        if (releases.length === 0) {
+          container.innerHTML = '<p class="error">No releases found</p>';
+          return;
+        }
+
+        // Update download section with latest
+        const latest = releases[0];
+        document.getElementById('version-badge').textContent = `v${latest.version}`;
+        document.getElementById('download-meta').textContent =
+          `Version ${latest.version} • Released ${formatDate(latest.date)} • Build ${latest.versionCode}`;
+        document.getElementById('release-notes-text').textContent = latest.notes || 'No release notes';
+        document.getElementById('download-link').href = latest.apk;
+
+        // Build versions table
+        const table = document.createElement('table');
+        table.className = 'versions-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Date</th>
+              <th>Build</th>
+              <th>Notes</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${releases.map((release, index) => `
+              <tr>
+                <td>
+                  <div class="version-cell">
+                    <span>v${release.version}</span>
+                    ${index === 0 ? '<span class="version-badge-small">latest</span>' : ''}
+                  </div>
+                </td>
+                <td>${formatDate(release.date)}</td>
+                <td>${release.versionCode}</td>
+                <td>${truncate(release.notes, 50)}</td>
+                <td>
+                  <a href="${release.apk}" class="link-btn">APK</a>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+
+        container.innerHTML = '';
+        container.appendChild(table);
+      } catch (error) {
+        container.innerHTML = `<p class="error">Error loading versions: ${error.message}</p>`;
+      }
+    }
+
+    // Format date nicely
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    // Truncate text
+    function truncate(text, maxLength) {
+      if (!text) return '-';
+      if (text.length <= maxLength) return text;
+      return text.substring(0, maxLength) + '...';
+    }
+
+    // Load versions on page load
+    document.addEventListener('DOMContentLoaded', loadVersions);
+  </script>
+</body>
+</html>

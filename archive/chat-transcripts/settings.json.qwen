@@ -1,0 +1,105 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__fill_form",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__select_page",
+      "mcp__chrome-devtools__press_key",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__handle_dialog",
+      "mcp__chrome-devtools__evaluate_script",
+      "Bash(tar:*)",
+      "Bash(bash:*)",
+      "Bash(curl:*)",
+      "Bash(xargs ls:*)",
+      "Bash(cat:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs ls:*)",
+      "Bash(python3:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(npx cypress:*)",
+      "Bash(apt-get install:*)",
+      "Bash(ls .env*:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(git:*)",
+      "Bash(npx svelte-check:*)",
+      "Bash(docker build:*)",
+      "Bash(docker:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(node:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx cypress:*)",
+      "Bash(grep:*)",
+      "Bash(tmux new-session:*)",
+      "Agent",
+      "WebSearch"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus[1m]",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/approve-logic.js"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline.sh"
+  },
+  "enabledPlugins": {
+    "claude-hud@claude-hud": true,
+    "agent-skills@addy-agent-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-hud": {
+      "source": {
+        "source": "github",
+        "repo": "jarrodwatts/claude-hud"
+      }
+    },
+    "addy-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "addyosmani/agent-skills"
+      }
+    }
+  },
+  "language": "中文",
+  "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true,
+  "verbose": true,
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "sk-sp-9e805f192896459cb4d4aaeaf1c47b53",
+    "ANTHROPIC_BASE_URL": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "qwen3.6-plus[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "qwen3.6-plus[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "qwen3.6-plus[1m]",
+    "ANTHROPIC_MODEL": "qwen3.6-plus[1m]",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": 1
+  }
+}

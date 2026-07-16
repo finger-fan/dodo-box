@@ -4,32 +4,64 @@ services:
     container_name: dodo-box-relay
     restart: unless-stopped
     ports:
-      - "7777:7777"
+      - "127.0.0.1:7777:7777"
     volumes:
       - relay-data:/app/strfry-db
       - ./docker/strfry.conf:/app/strfry.conf:ro
     command: ["--config", "/app/strfry.conf", "relay"]
+    environment:
+      - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7777 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
   app:
+    image: dodo-box:latest
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     container_name: dodo-box-app
     restart: unless-stopped
     ports:
       - "127.0.0.1:18300:3000"
     environment:
-      - NEXT_PUBLIC_NOSTR_MOCK=false
-      - NEXT_PUBLIC_DEFAULT_RELAYS=ws://relay:7777
+      - DEFAULT_RELAYS=ws://localhost:7777
       - NEXT_PUBLIC_VAULT_SALT=dodobox-vault-v1
       - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
+      - NEXT_PUBLIC_MOCK_TELEGRAM_TOKEN=mock-bot-token-12345
+      - MOCK_BOT_USERNAME=dodobox_bot
+      - MOCK_BOT_FIRST_NAME=DodoBox Bot
+      # Default message TTL in seconds (0 = permanent, 86400 = 1 day, 2592000 = 30 days)
+      - DEFAULT_MESSAGE_TTL=${DEFAULT_MESSAGE_TTL:-0}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       relay:
         condition: service_healthy

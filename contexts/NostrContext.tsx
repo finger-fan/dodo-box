@@ -19,7 +19,9 @@ import {
   removeIdentityFromVault,
 } from '@/lib/nostr/vault-crypto'
 import { vaultSync } from '@/lib/nostr/vault-sync'
-import { createNostrAdapter } from '@/lib/nostr'
+import { getConnectedRelays } from '@/lib/welshman/relay-manager'
+import { createNostrAdapter, getAdapterMode, setAdapterMode, type AdapterMode } from '@/lib/nostr'
+import { getRuntimeConfig, getDefaultRelays, getUserRelays } from '@/lib/runtime-config'
 import type {
   NostrSession,
   VaultData,
@@ -33,6 +35,7 @@ const SESSION_STORAGE_KEY = 'dodobox_session'
 interface NostrContextValue {
   session: NostrSession
   adapter: INostrAdapter
+  adapterMode: AdapterMode
   login(username: string, password: string): Promise<NostrResult<NostrSession>>
   register(username: string, password: string): Promise<NostrResult<NostrSession>>
   logout(): void
@@ -40,6 +43,7 @@ interface NostrContextValue {
   createIdentity(name: string): Promise<NostrResult<VaultIdentity>>
   deleteIdentity(pubkey: string): Promise<NostrResult>
   updateIdentityName(pubkey: string, name: string): Promise<NostrResult>
+  setAdapterMode(mode: AdapterMode): void
 }
 
 export const NostrContext = createContext<NostrContextValue | null>(null)
@@ -79,9 +83,27 @@ function loadPersistedSession(): PersistedSession {
 }
 
 export function NostrProvider({ children }: { children: ReactNode }) {
+  const initialAdapterMode = getAdapterMode()
+
   const [session, setSession] = useState<NostrSession>(() => {
+    // In mock-telegram mode, auto-create a dummy session
+    if (initialAdapterMode === 'mock-telegram') {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dodobox_account_active', 'true')
+        localStorage.setItem('dodobox_current_user', 'mock-user')
+      }
+      return {
+        isAuthenticated: true,
+        username: 'mock-user',
+        currentPubkey: 'tg:mock',
+        vaultData: null,
+      }
+    }
+
     const persisted = loadPersistedSession()
     if (persisted.isAuthenticated && persisted.currentPubkey) {
+      // Note: On page refresh, private keys will be lost (memory-only refs).
+      // The useEffect below handles auto-logout for this case.
       return {
         isAuthenticated: persisted.isAuthenticated,
         username: persisted.username,
@@ -94,28 +116,99 @@ export function NostrProvider({ children }: { children: ReactNode }) {
   // Private key lives ONLY in memory ref, never in React state
   const masterPrivkeyRef = useRef<string | null>(null)
   const identityPrivkeyRef = useRef<string | null>(null)
-  const [adapter, setAdapter] = useState<INostrAdapter>(() => createNostrAdapter())
+  const [adapter, setAdapter] = useState<INostrAdapter>(() => {
+    if (initialAdapterMode === 'mock-telegram') {
+      return createNostrAdapter({
+        isAuthenticated: true,
+        username: 'mock-user',
+        currentPubkey: 'tg:mock',
+        vaultData: null,
+      } as NostrSession)
+    }
+    return createNostrAdapter()
+  })
+  const [currentAdapterMode, setCurrentAdapterMode] = useState<AdapterMode>(initialAdapterMode)
+
+  const runtimeRelaysRef = useRef<string[] | null>(null)
+  const configPromiseRef = useRef<Promise<string[]> | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    configPromiseRef.current = getRuntimeConfig()
+      .then(config => {
+        runtimeRelaysRef.current = config.relays
+        vaultSync.setRelayUrls(config.relays)
+        return config.relays
+      })
+      .catch(err => {
+        console.warn('[NostrContext] Failed to load runtime config, using defaults:', err)
+        const defaults = getDefaultRelays()
+        runtimeRelaysRef.current = defaults
+        vaultSync.setRelayUrls(defaults)
+        return defaults
+      })
+  }, [])
+
+  // Auto-logout on page refresh when privkey is lost (session persisted but key in memory is gone)
+  useEffect(() => {
+    if (!session.isAuthenticated) return
+    if (identityPrivkeyRef.current || masterPrivkeyRef.current) return
+    // Session was restored from localStorage but private keys are lost — defer state updates
+    queueMicrotask(() => {
+      masterPrivkeyRef.current = null
+      identityPrivkeyRef.current = null
+     setSession(EMPTY_SESSION)
+     if (typeof window !== 'undefined') {
+        localStorage.setItem('dodobox_refresh_logout', 'true')
+        localStorage.removeItem(SESSION_STORAGE_KEY)
+        localStorage.removeItem('dodobox_account_active')
+        localStorage.removeItem('dodobox_current_user')
+      }
+      setAdapter(createNostrAdapter())
+    })
+  }, [session])
 
   function persistSession(s: NostrSession & { masterPubkey?: string }) {
     if (typeof window === 'undefined') return
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({
-        isAuthenticated: s.isAuthenticated,
-        username: s.username,
-        currentPubkey: s.currentPubkey,
-        masterPubkey: s.masterPubkey,
-        vaultData: null,
-      })
-    )
+    try {
+      localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          isAuthenticated: s.isAuthenticated,
+          username: s.username,
+          currentPubkey: s.currentPubkey,
+          masterPubkey: s.masterPubkey,
+          vaultData: null,
+        })
+      )
+    } catch (err) {
+      console.warn('[NostrContext] Failed to persist session to localStorage:', err)
+    }
+  }
+
+  async function ensureRelays(): Promise<string[]> {
+    const userRelays = getUserRelays()
+    if (userRelays.length > 0) {
+      runtimeRelaysRef.current = userRelays
+      vaultSync.setRelayUrls(userRelays)
+      return userRelays
+    }
+    if (runtimeRelaysRef.current) return runtimeRelaysRef.current
+    if (configPromiseRef.current) return configPromiseRef.current
+    const defaults = getDefaultRelays()
+    runtimeRelaysRef.current = defaults
+    vaultSync.setRelayUrls(defaults)
+    return defaults
   }
 
   function buildAdapterForSession(
     newSession: NostrSession,
-    privkey: string
+    privkey: string,
+    relays?: string[]
   ): INostrAdapter {
     const sessionWithKey = { ...newSession, currentPrivkey: privkey }
-    return createNostrAdapter(sessionWithKey)
+    return createNostrAdapter(sessionWithKey, relays)
   }
 
   const login = useCallback(async (
@@ -126,13 +219,18 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       const masterKey = deriveMasterKey(username, password)
       masterPrivkeyRef.current = masterKey.privateKey
 
+      const relays = await ensureRelays()
       const vaultData = await vaultSync.fetchVault(
         masterKey.publicKey,
         masterKey.privateKey
       )
 
       if (!vaultData) {
-        return { success: false, error: 'Account not found' }
+        const connected = getConnectedRelays().length
+        const error = connected === 0
+          ? 'No relay connection. Check your network and try again.'
+          : 'Account not found'
+        return { success: false, error }
       }
 
       // Pick first identity or use master key as fallback
@@ -164,7 +262,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       setSession(newSession)
       persistSession({ ...newSession, masterPubkey: masterKey.publicKey })
 
-      const newAdapter = buildAdapterForSession(newSession, currentPrivkey)
+      const newAdapter = buildAdapterForSession(newSession, currentPrivkey, relays)
       setAdapter(newAdapter)
 
       return { success: true, data: newSession }
@@ -181,6 +279,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     try {
       const masterKey = deriveMasterKey(username, password)
 
+      const relays = await ensureRelays()
       const exists = await vaultSync.checkVaultExists(masterKey.publicKey)
       if (exists) {
         return { success: false, error: 'Account already exists' }
@@ -207,6 +306,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
     const newAdapter = createNostrAdapter()
     setAdapter(newAdapter)
+    setCurrentAdapterMode(getAdapterMode())
   }, [])
 
   const switchIdentity = useCallback(async (pubkey: string): Promise<NostrResult> => {
@@ -224,6 +324,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       const identityPrivkey = await decryptSecret(masterPrivkey, identity.encryptedSecret)
       identityPrivkeyRef.current = identityPrivkey
 
+      const relays = await ensureRelays()
       const newSession: NostrSession = {
         ...session,
         currentPubkey: pubkey,
@@ -231,7 +332,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       setSession(newSession)
       persistSession({ ...newSession })
 
-      const newAdapter = buildAdapterForSession(newSession, identityPrivkey)
+      const newAdapter = buildAdapterForSession(newSession, identityPrivkey, relays)
       setAdapter(newAdapter)
 
       return { success: true, data: undefined }
@@ -257,8 +358,9 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         createdAt: Date.now(),
       }
 
-      const updatedVault = addIdentityToVault(session.vaultData, identity)
-      await vaultSync.updateVault(masterPrivkey, updatedVault)
+     const updatedVault = addIdentityToVault(session.vaultData, identity)
+      await ensureRelays()
+     await vaultSync.updateVault(masterPrivkey, updatedVault)
 
       const newSession: NostrSession = {
         ...session,
@@ -283,8 +385,9 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const updatedVault = removeIdentityFromVault(session.vaultData, pubkey)
-      await vaultSync.updateVault(masterPrivkey, updatedVault)
+     const updatedVault = removeIdentityFromVault(session.vaultData, pubkey)
+      await ensureRelays()
+     await vaultSync.updateVault(masterPrivkey, updatedVault)
 
       setSession(prev => ({ ...prev, vaultData: updatedVault }))
       return { success: true, data: undefined }
@@ -306,12 +409,13 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       const updatedIdentities = session.vaultData.identities.map(i =>
         i.pubkey === pubkey ? { ...i, name } : i
       )
-      const updatedVault: VaultData = {
-        ...session.vaultData,
-        identities: updatedIdentities,
-        updatedAt: Date.now(),
-      }
-      await vaultSync.updateVault(masterPrivkey, updatedVault)
+     const updatedVault: VaultData = {
+       ...session.vaultData,
+       identities: updatedIdentities,
+       updatedAt: Date.now(),
+     }
+      await ensureRelays()
+     await vaultSync.updateVault(masterPrivkey, updatedVault)
       setSession(prev => ({ ...prev, vaultData: updatedVault }))
       return { success: true, data: undefined }
     } catch (error) {
@@ -319,11 +423,44 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
+  const switchAdapterMode = useCallback((mode: AdapterMode) => {
+    setAdapterMode(mode)
+    setCurrentAdapterMode(mode)
+
+    // In mock-telegram mode, bypass vault login
+    if (mode === 'mock-telegram') {
+      const mockSession: NostrSession = {
+        isAuthenticated: true,
+        username: 'mock-user',
+        currentPubkey: 'tg:mock',
+        vaultData: null,
+      }
+      setSession(mockSession)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dodobox_account_active', 'true')
+        localStorage.setItem('dodobox_current_user', 'mock-user')
+      }
+      setAdapter(createNostrAdapter(mockSession))
+    } else {
+      // Switch back to real mode — require re-login
+      masterPrivkeyRef.current = null
+      identityPrivkeyRef.current = null
+      setSession(EMPTY_SESSION)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_STORAGE_KEY)
+        localStorage.removeItem('dodobox_account_active')
+        localStorage.removeItem('dodobox_current_user')
+      }
+      setAdapter(createNostrAdapter())
+    }
+  }, [])
+
   return (
     <NostrContext.Provider
       value={{
         session,
         adapter,
+        adapterMode: currentAdapterMode,
         login,
         register,
         logout,
@@ -331,6 +468,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         createIdentity,
         deleteIdentity,
         updateIdentityName,
+        setAdapterMode: switchAdapterMode,
       }}
     >
       {children}

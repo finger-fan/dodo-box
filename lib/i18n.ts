@@ -13,9 +13,15 @@ i18n
       en: { translation: en },
       zh: { translation: zh },
     },
-    fallbackLng: 'en',
+    fallbackLng: 'zh',
     interpolation: {
       escapeValue: false,
+    },
+    detection: {
+      // 默认中文;不读 navigator,用户手动切换后记忆(localStorage)
+      order: ['localStorage'],
+      lookupLocalStorage: 'dodobox_language',
+      caches: ['localStorage'],
     },
   });
 

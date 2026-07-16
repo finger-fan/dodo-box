@@ -1,0 +1,13 @@
+{
+  "latest": "0.8.8",
+  "releases": [
+    {
+      "version": "0.8.8",
+      "date": "2026-03-27",
+      "versionCode": 3,
+      "apk": "apks/dodo-box-0.8.8.apk",
+      "bundle": "updates/0.8.8/bundle.zip",
+      "notes": "Initial public release"
+    }
+  ]
+}
