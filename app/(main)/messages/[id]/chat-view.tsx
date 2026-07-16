@@ -55,11 +55,20 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load contact profile
+  // Load contact display name: petname from contacts first, then kind:0 profile, then short pubkey
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    adapter.getProfile(id).then((profile) => {
+    (async () => {
+      const contacts = await adapter.getContacts();
+      if (cancelled) return;
+      const contact = contacts.find((c) => c.pubkey === id);
+      if (contact) {
+        setChatName(contact.name || shortPubkey(id));
+        setChatAvatar(contact.avatar || defaultAvatar(id));
+        return;
+      }
+      const profile = await adapter.getProfile(id);
       if (cancelled) return;
       if (profile) {
         setChatName(profile.displayName || profile.name || shortPubkey(id));
@@ -68,7 +77,7 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
         setChatName(shortPubkey(id));
         setChatAvatar(defaultAvatar(id));
       }
-    });
+    })();
     return () => { cancelled = true; };
   }, [id, adapter]);
 
