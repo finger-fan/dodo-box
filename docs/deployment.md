@@ -58,11 +58,13 @@ pnpm check            # tsc --noEmit + eslint
 
 客户端通过以下优先级获取 relay URL：
 
-1. **用户手动配置**（localStorage `dodobox_user_relays`）— 在 Settings 页面编辑
+1. **用户手动配置**（localStorage `dodobox_user_relays`）— 在 Settings 页面或登录页设置对话框中编辑
 2. **服务器运行时配置**（`/api/config` 端点返回 `DEFAULT_RELAYS` 环境变量）
 3. **编译时默认值**（`NEXT_PUBLIC_DEFAULT_RELAYS` 或 `wss://relay.damus.io`）
 
 这意味着 Docker 部署时无需重新构建镜像即可修改 relay 地址。
+
+**APK 构建**：静态导出不包含 `/api/config`,relay 默认值在构建期内联。APK 构建使用 `.env.release`（由 `scripts/cap-build-export.js` 加载，系统环境变量优先级更高）;本地开发使用 `.env.local`。登录前也可在登录页右上角设置对话框中修改 relay（写入 localStorage)。
 
 ### Docker Compose 服务
 

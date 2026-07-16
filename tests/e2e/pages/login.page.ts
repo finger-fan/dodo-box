@@ -5,6 +5,10 @@ export class LoginPage {
   constructor(private readonly page: Page) {}
 
   async goto() {
+    // App defaults to Chinese; force English so text-based selectors stay valid
+    await this.page.addInitScript(() => {
+      localStorage.setItem('dodobox_language', 'en')
+    })
     await this.page.goto('/login')
     await this.page.waitForLoadState('networkidle')
   }

@@ -114,6 +114,7 @@ Tailwind CSS v4 + `@tailwindcss/postcss`。暗色模式通过 class 策略（`ne
 - `DISABLE_HMR` - 设为 `"true"` 可禁用热模块替换
 - `NEXT_PUBLIC_UPDATE_URL` - OTA 更新 manifest URL
 - `NEXT_PUBLIC_APP_VERSION` - 应用版本号（可选，默认从 package.json 读取）
+- `NEXT_PUBLIC_DEFAULT_RELAYS` - 默认 relay 列表（逗号分隔）。本地开发放 `.env.local`（当前为 `ws://localhost:7777`）；APK 构建放 `.env.release`（由 `scripts/cap-build-export.js` 加载，系统环境变量优先级更高）
 
 ### OTA 更新
 
