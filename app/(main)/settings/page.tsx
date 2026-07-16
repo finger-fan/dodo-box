@@ -1,22 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCircle, LogOut, Globe, Moon, Shield,
+  UserCircle, LogOut, Shield,
   Trash2, Download, ChevronRight, Clock,
   RefreshCw, RotateCcw, Loader2,
+  Server,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from 'next-themes';
 import Toast from '@/components/ui/Toast';
 import IdentityModal from '@/components/settings/IdentityModal';
+import GeneralSettings from '@/components/settings/GeneralSettings';
 import { cn, shortPubkey } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
+import type { AdapterMode } from '@/lib/nostr';
 
 const TTL_OPTIONS = [
   { value: 600, labelKey: 'settings.ttl_10min' },
@@ -29,15 +31,13 @@ const TTL_OPTIONS = [
 ];
 
 export default function SettingsPage() {
-  const { t, i18n } = useTranslation();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
-  const { session, logout, adapter } = useNostr();
+  const { session, adapterMode, setAdapterMode, logout } = useNostr();
 
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const mounted = useMounted();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [relays, setRelays] = useState(() => adapter.getRelays());
   const [messageTtl, setMessageTtl] = useState(() => {
     try {
       const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null;
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
+
   const updater = useUpdater();
   const isNative = mounted && Capacitor.isNativePlatform();
 
@@ -71,12 +72,18 @@ export default function SettingsPage() {
 
   const currentTtlLabel = TTL_OPTIONS.find(o => o.value === messageTtl)?.labelKey || 'settings.ttl_30days';
 
-  const handleLanguageChange = (lang: string) => {
-    i18n.changeLanguage(lang);
-  };
-
   const handleToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
+  };
+
+  const handleAdapterModeChange = (mode: AdapterMode) => {
+    setAdapterMode(mode);
+    // After switching, redirect to login for real mode, or stay for mock
+    if (mode === 'mock-telegram') {
+      handleToast('Switched to Telegram Mock mode', 'success');
+    } else {
+      handleToast('Switched to Nostr Real mode — please login again', 'success');
+    }
   };
 
   if (!mounted) return null;
@@ -123,40 +130,8 @@ export default function SettingsPage() {
         {/* Preferences */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.preferences')}</div>
+          <GeneralSettings onToast={handleToast} />
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <div className="lang-switcher flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
-              <div className="flex items-center gap-3">
-                <Globe className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.language')}</span>
-              </div>
-              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button
-                  onClick={() => handleLanguageChange('en')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    i18n.language === 'en' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >EN</button>
-                <button
-                  onClick={() => handleLanguageChange('zh')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    i18n.language === 'zh' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >ZH</button>
-              </div>
-            </div>
-            <div className="theme-menu flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
-              <div className="flex items-center gap-3">
-                <Moon className="w-5 h-5 text-zinc-400" />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.theme')}</span>
-              </div>
-              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button onClick={() => setTheme('light')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'light' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.light')}</button>
-                <button onClick={() => setTheme('system')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", theme === 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.system')}</button>
-                <button onClick={() => setTheme('dark')} className={cn("px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all", resolvedTheme === 'dark' && theme !== 'system' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400")}>{t('settings.dark')}</button>
-              </div>
-            </div>
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5 text-zinc-400" />
@@ -182,30 +157,40 @@ export default function SettingsPage() {
                 )} />
               </button>
             </div>
+            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Server className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Connection Mode</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">
+                    {adapterMode === 'mock-telegram' ? 'Using Mock Telegram' : 'Using Nostr Relays'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+                <button
+                  onClick={() => handleAdapterModeChange('real')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'real' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Nostr</button>
+                <button
+                  onClick={() => handleAdapterModeChange('mock-telegram')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
+                    adapterMode === 'mock-telegram' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
+                  )}
+                >Mock</button>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* Network & Relays */}
+        {/* Network & Data */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.network_data')}</div>
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <div className="relay-list p-4 border-b border-zinc-50 dark:border-zinc-800">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-zinc-400" />
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.relays')}</span>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded uppercase">{relays.length} Configured</span>
-              </div>
-              <div className="space-y-2">
-                {relays.map((relay) => (
-                  <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
-                    <span>{relay}</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
             <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

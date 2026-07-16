@@ -6,9 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Test artifacts (generated, not for VCS)
 playwright-report/
 test-results/
 tests/e2e/screenshots/
+
+# TypeScript incremental build cache
 tsconfig.tsbuildinfo
 root_claude_settings
 
@@ -23,6 +27,8 @@ android/local.properties
 out/
 .cap-backup/
 
+.claude/settings.json.*
+
 # Keystore
 android/sign-key/
 *.keystore
@@ -33,3 +39,5 @@ site/apks/*.apk
 site/updates/*/
 !site/updates/.gitkeep
 !site/apks/.gitkeep
+.gstack/
+next-swc-*.tgz

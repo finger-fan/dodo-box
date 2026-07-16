@@ -20,6 +20,10 @@ export class VaultSync {
       (process.env.NEXT_PUBLIC_DEFAULT_RELAYS || 'wss://relay.damus.io').split(',')
   }
 
+  setRelayUrls(relayUrls: string[]): void {
+    this.relayUrls = [...relayUrls]
+  }
+
   async checkVaultExists(masterPublicKey: string): Promise<boolean> {
     connectToRelays(this.relayUrls)
 

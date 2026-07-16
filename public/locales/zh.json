@@ -5,6 +5,7 @@
     "discover_tab": "发现",
     "settings": "设置",
     "search": "搜索...",
+    "create": "新建",
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
@@ -49,7 +50,9 @@
     "identity_deleted": "身份已删除",
     "coming_soon": "即将推出",
     "contact_cache": "联系人缓存",
-    "contact_cache_desc": "本地缓存联系人名称以减少加载延迟。关闭可获得最大隐私保护。"
+    "contact_cache_desc": "本地缓存联系人名称以减少加载延迟。关闭可获得最大隐私保护。",
+    "relays_configured": "已配置",
+    "relays_updated": "中继已更新"
   },
   "contacts": {
     "add_contact": "添加联系人",
@@ -98,5 +101,33 @@
     "title": "出现了问题",
     "description": "发生了意外错误，请重试。",
     "retry": "重试"
+  },
+  "messages": {
+    "no_chats": "暂无聊天",
+    "add_contact_prompt": "添加联系人开始聊天",
+    "add_contact": "添加联系人"
+  },
+  "auth": {
+    "refresh_logout": "为了安全，刷新页面后您已退出登录",
+    "tagline": "去中心化账户管理",
+    "login_method": "登录账户",
+    "login_method_desc": "通过用户名和密码派生密钥",
+    "register_method": "注册账户",
+    "register_method_desc": "在中继上创建新凭证",
+    "login_title": "账户登录",
+    "register_title": "账户注册",
+    "username": "用户名",
+    "password": "密码",
+    "enter_username": "请输入用户名",
+    "enter_password": "请输入密码",
+    "back": "返回",
+    "login": "登录",
+    "register": "注册",
+    "registered_success": "注册成功！现在可以登录了。",
+    "login_failed": "登录失败",
+    "registration_failed": "注册失败",
+    "error_no_relay": "无法连接中继，请检查网络和中继设置后重试",
+    "error_account_not_found": "账户不存在",
+    "error_account_exists": "账户已存在"
   }
 }

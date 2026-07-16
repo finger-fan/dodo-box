@@ -22,7 +22,9 @@ import {
   fetchEvents,
   subscribe as welshmanSubscribe,
   getConnectedRelays,
+  closeAllRelays,
 } from '@/lib/welshman/relay-manager'
+import { getUserRelays, setUserRelays } from '@/lib/runtime-config'
 import {
   buildDirectMessageEvent,
   createGiftWrap,
@@ -69,11 +71,14 @@ export class RealNostrAdapter implements INostrAdapter {
   private chats: NostrChat[] = []
   private contactsFetchPromise: Promise<NostrContact[]> | null = null
 
-  constructor(session: NostrSession) {
+  constructor(session: NostrSession, relayUrls?: string[]) {
     this.session = session
-    this.relayUrls = (
-      process.env.NEXT_PUBLIC_DEFAULT_RELAYS || 'wss://relay.damus.io'
-    ).split(',')
+    const userRelays = getUserRelays()
+    this.relayUrls = relayUrls?.length
+      ? [...relayUrls]
+      : userRelays.length > 0
+      ? [...userRelays]
+      : (process.env.NEXT_PUBLIC_DEFAULT_RELAYS || 'wss://relay.damus.io').split(',')
 
     // Restore cached contacts so names display immediately before relay responds
     if (session.currentPubkey) {
@@ -124,9 +129,20 @@ export class RealNostrAdapter implements INostrAdapter {
 
       if (!isFromContact && !isFromMe) continue
 
+      // Parse JSON format { text: "..." } from CLI, fallback to raw content
+      let messageText = innerEvent.content
+      try {
+        const parsed = JSON.parse(innerEvent.content)
+        if (parsed && typeof parsed.text === 'string') {
+          messageText = parsed.text
+        }
+      } catch {
+        // Not JSON, use raw content
+      }
+
       messages.push({
         id: innerEvent.id,
-        text: innerEvent.content,
+        text: messageText,
         sender: isFromMe ? 'me' : 'them',
         timestamp: new Date(innerEvent.created_at * 1000),
         senderPubkey: innerEvent.pubkey,
@@ -157,7 +173,15 @@ export class RealNostrAdapter implements INostrAdapter {
 
     try {
       const seq = incrementSeqCounter(this.session.currentPubkey, contactPubkey)
-      const innerEvent = buildDirectMessageEvent(text, contactPubkey, this.privkey, seq)
+
+      // Get TTL from localStorage (set in Settings page), fallback to env var
+      const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null
+      const envTtl = process.env.NEXT_PUBLIC_DEFAULT_MESSAGE_TTL
+      const ttl = savedTtl ? parseInt(savedTtl, 10) : (envTtl ? parseInt(envTtl, 10) : 0)
+      const expiration = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : undefined
+
+      // Use JSON format { text: "..." } to match CLI format
+      const innerEvent = buildDirectMessageEvent(JSON.stringify({ text }), contactPubkey, this.privkey, seq, expiration)
 
       // Two gift wraps: one for recipient, one for sender
       const wrapForRecipient = await createGiftWrap(innerEvent, contactPubkey, this.privkey)
@@ -217,9 +241,20 @@ export class RealNostrAdapter implements INostrAdapter {
         const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
         if (!innerEvent || innerEvent.pubkey !== contactPubkey) return
 
+        // Parse JSON format { text: "..." } from CLI, fallback to raw content
+        let messageText = innerEvent.content
+        try {
+          const parsed = JSON.parse(innerEvent.content)
+          if (parsed && typeof parsed.text === 'string') {
+            messageText = parsed.text
+          }
+        } catch {
+          // Not JSON, use raw content
+        }
+
         callback({
           id: innerEvent.id,
-          text: innerEvent.content,
+          text: messageText,
           sender: 'them',
           timestamp: new Date(innerEvent.created_at * 1000),
           senderPubkey: innerEvent.pubkey,
@@ -246,7 +281,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
     connectToRelays(this.relayUrls)
 
-    this.contactsFetchPromise = fetchEvents(filters, this.relayUrls).then((events) => {
+    this.contactsFetchPromise = fetchEvents(filters, this.relayUrls).then(async (events) => {
       if (events.length > 0) {
         // Use the most recent event
         const event = events.sort((a, b) => b.created_at - a.created_at)[0]
@@ -255,12 +290,48 @@ export class RealNostrAdapter implements INostrAdapter {
           .filter(t => t[0] === 'p' && t[1])
           .map(t => ({ pubkey: t[1], petname: sanitizePetname(t[3]) }))
 
-        this.contacts = contactTags.map((ct, i) => ({
-          id: `contact-${i}`,
-          name: ct.petname || shortPubkey(ct.pubkey),
-          pubkey: ct.pubkey,
-          avatar: defaultAvatar(ct.pubkey),
-        }))
+        // Fetch kind:0 profiles for display name fallback
+        const profileMap = new Map<string, NostrProfile>()
+        if (contactTags.length > 0) {
+          const profileFilters: NostrFilter[] = [
+            {
+              kinds: [KIND_PROFILE],
+              authors: contactTags.map(ct => ct.pubkey),
+              limit: contactTags.length,
+            },
+          ]
+          try {
+            const profileEvents = await fetchEvents(profileFilters, this.relayUrls)
+            for (const ev of profileEvents) {
+              try {
+                const meta = JSON.parse(ev.content)
+                profileMap.set(ev.pubkey, {
+                  pubkey: ev.pubkey,
+                  name: meta.name,
+                  displayName: meta.display_name || meta.name,
+                  picture: meta.picture,
+                  about: meta.about,
+                  nip05: meta.nip05,
+                })
+              } catch {
+                // ignore malformed profile
+              }
+            }
+          } catch {
+            // ignore profile fetch failures
+          }
+        }
+
+        this.contacts = contactTags.map((ct, i) => {
+          const profile = profileMap.get(ct.pubkey)
+          const name = ct.petname || profile?.displayName || profile?.name || shortPubkey(ct.pubkey)
+          return {
+            id: `contact-${i}`,
+            name,
+            pubkey: ct.pubkey,
+            avatar: profile?.picture || defaultAvatar(ct.pubkey),
+          }
+        })
 
         this.rebuildChats()
         if (this.session.currentPubkey) {
@@ -453,9 +524,20 @@ export class RealNostrAdapter implements INostrAdapter {
 
       if (!isFromContact && !isFromMe) continue
 
+      // Parse JSON format { text: "..." } from CLI, fallback to raw content
+      let messageText = innerEvent.content
+      try {
+        const parsed = JSON.parse(innerEvent.content)
+        if (parsed && typeof parsed.text === 'string') {
+          messageText = parsed.text
+        }
+      } catch {
+        // Not JSON, use raw content
+      }
+
       messages.push({
         id: innerEvent.id,
-        text: innerEvent.content,
+        text: messageText,
         sender: isFromMe ? 'me' : 'them',
         timestamp: new Date(innerEvent.created_at * 1000),
         senderPubkey: innerEvent.pubkey,
@@ -468,11 +550,10 @@ export class RealNostrAdapter implements INostrAdapter {
 
   async setRelays(relays: string[]): Promise<NostrResult> {
     this.relayUrls = [...relays]
+    setUserRelays(relays)
     closeAllRelays()
     connectToRelays(relays)
     return { success: true, data: undefined }
   }
 }
 
-// Import for setRelays
-import { closeAllRelays } from '@/lib/welshman/relay-manager'

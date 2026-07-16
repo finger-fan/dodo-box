@@ -57,16 +57,21 @@ export function buildFollowListEvent(
 
 /**
  * Build a kind-14 direct message event (the inner rumor).
+ * Optionally includes expiration tag (NIP-40) for message TTL.
  */
 export function buildDirectMessageEvent(
   content: string,
   recipientPubkey: string,
   senderPrivkeyHex: string,
-  seq?: number
+  seq?: number,
+  expiration?: number
 ): SignedEvent {
   const tags: string[][] = [['p', recipientPubkey]]
   if (seq !== undefined) {
     tags.push(['seq', String(seq)])
+  }
+  if (expiration !== undefined && expiration > 0) {
+    tags.push(['expiration', String(expiration)])
   }
   return signEvent(DIRECT_MESSAGE, content, tags, senderPrivkeyHex)
 }

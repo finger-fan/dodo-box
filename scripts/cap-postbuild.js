@@ -12,6 +12,7 @@ const backupDir = path.join(root, '.cap-backup');
 const targets = [
   { src: path.join(backupDir, 'middleware.ts'), dst: path.join(root, 'middleware.ts') },
   { src: path.join(backupDir, 'api'), dst: path.join(root, 'app', 'api') },
+  { src: path.join(backupDir, 'env.local'), dst: path.join(root, '.env.local') },
 ];
 
 for (const { src, dst } of targets) {

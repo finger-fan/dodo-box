@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest'
+
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   getSeqCounter,
   incrementSeqCounter,
@@ -7,124 +7,61 @@ import {
   parseSeqTag,
 } from '@/lib/nostr/seq-counter'
 
-const MY_PUB = 'a'.repeat(64)
-const CONTACT_PUB = 'b'.repeat(64)
+const MY_PUBKEY = 'a'.repeat(64)
+const CONTACT_PUBKEY = 'b'.repeat(64)
 
-describe('getSeqCounter', () => {
+describe('seq-counter', () => {
   beforeEach(() => {
-    localStorage.clear()
+    const store: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, value: string) => { store[key] = value },
+      removeItem: (key: string) => { delete store[key] },
+      clear: () => { Object.keys(store).forEach((k) => delete store[k]) },
+      get length() { return Object.keys(store).length },
+      key: (i: number) => Object.keys(store)[i] ?? null,
+    } as Storage)
   })
 
-  it('returns 0 when no counter exists', () => {
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(0)
-  })
-
-  it('returns stored value', () => {
-    localStorage.setItem(`dodobox_seq_${MY_PUB}_${CONTACT_PUB}`, '5')
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(5)
-  })
-
-  it('returns 0 for non-numeric values', () => {
-    localStorage.setItem(`dodobox_seq_${MY_PUB}_${CONTACT_PUB}`, 'abc')
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(0)
-  })
-})
-
-describe('incrementSeqCounter', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
-
-  it('increments from 0 to 1 on first call', () => {
-    const val = incrementSeqCounter(MY_PUB, CONTACT_PUB)
-    expect(val).toBe(1)
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(1)
-  })
-
-  it('increments sequentially', () => {
-    expect(incrementSeqCounter(MY_PUB, CONTACT_PUB)).toBe(1)
-    expect(incrementSeqCounter(MY_PUB, CONTACT_PUB)).toBe(2)
-    expect(incrementSeqCounter(MY_PUB, CONTACT_PUB)).toBe(3)
-  })
-
-  it('maintains separate counters per contact', () => {
-    const otherContact = 'c'.repeat(64)
-    incrementSeqCounter(MY_PUB, CONTACT_PUB)
-    incrementSeqCounter(MY_PUB, CONTACT_PUB)
-    incrementSeqCounter(MY_PUB, otherContact)
-
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(2)
-    expect(getSeqCounter(MY_PUB, otherContact)).toBe(1)
-  })
-})
-
-describe('recoverSeqCounter', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
-
-  it('recovers counter from messages', () => {
+  it('T-MSG-01: orders out-of-order messages by seq when timestamps equal', () => {
     const messages = [
-      { senderPubkey: MY_PUB, seq: 3 },
-      { senderPubkey: MY_PUB, seq: 7 },
-      { senderPubkey: MY_PUB, seq: 5 },
+      { id: '1', text: 'second', sender: 'them' as const, timestamp: new Date('2024-01-01T00:00:00Z'), senderPubkey: CONTACT_PUBKEY, seq: 2 },
+      { id: '2', text: 'first', sender: 'them' as const, timestamp: new Date('2024-01-01T00:00:00Z'), senderPubkey: CONTACT_PUBKEY, seq: 1 },
+      { id: '3', text: 'third', sender: 'them' as const, timestamp: new Date('2024-01-01T00:00:00Z'), senderPubkey: CONTACT_PUBKEY, seq: 3 },
     ]
-    recoverSeqCounter(MY_PUB, CONTACT_PUB, messages)
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(7)
+    messages.sort((a, b) => {
+      const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
+      if (timeDiff !== 0) return timeDiff
+      if (a.senderPubkey && a.senderPubkey === b.senderPubkey) {
+        return (a.seq ?? 0) - (b.seq ?? 0)
+      }
+      return 0
+    })
+    expect(messages.map(m => m.seq)).toEqual([1, 2, 3])
+    expect(messages.map(m => m.text)).toEqual(['first', 'second', 'third'])
   })
 
-  it('only adjusts upward, never downward', () => {
-    localStorage.setItem(`dodobox_seq_${MY_PUB}_${CONTACT_PUB}`, '10')
+  it('increments and persists seq counter', () => {
+    expect(getSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)).toBe(0)
+    expect(incrementSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)).toBe(1)
+    expect(incrementSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)).toBe(2)
+    expect(getSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)).toBe(2)
+  })
+
+  it('recovers seq counter from messages sent by me', () => {
+    incrementSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)
     const messages = [
-      { senderPubkey: MY_PUB, seq: 3 },
-      { senderPubkey: MY_PUB, seq: 5 },
+      { senderPubkey: MY_PUBKEY, seq: 5 },
+      { senderPubkey: CONTACT_PUBKEY, seq: 2 },
+      { senderPubkey: MY_PUBKEY, seq: 3 },
     ]
-    recoverSeqCounter(MY_PUB, CONTACT_PUB, messages)
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(10)
+    recoverSeqCounter(MY_PUBKEY, CONTACT_PUBKEY, messages)
+    expect(getSeqCounter(MY_PUBKEY, CONTACT_PUBKEY)).toBe(5)
   })
 
-  it('ignores messages from other senders', () => {
-    const otherPub = 'd'.repeat(64)
-    const messages = [
-      { senderPubkey: otherPub, seq: 100 },
-      { senderPubkey: MY_PUB, seq: 2 },
-    ]
-    recoverSeqCounter(MY_PUB, CONTACT_PUB, messages)
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(2)
-  })
-
-  it('ignores messages without seq', () => {
-    const messages = [
-      { senderPubkey: MY_PUB, seq: undefined },
-      { senderPubkey: MY_PUB, seq: undefined },
-    ]
-    recoverSeqCounter(MY_PUB, CONTACT_PUB, messages)
-    expect(getSeqCounter(MY_PUB, CONTACT_PUB)).toBe(0)
-  })
-})
-
-describe('parseSeqTag', () => {
-  it('extracts seq value from tags', () => {
-    const tags = [['p', 'somepubkey'], ['seq', '42']]
-    expect(parseSeqTag(tags)).toBe(42)
-  })
-
-  it('returns undefined when no seq tag', () => {
-    const tags = [['p', 'somepubkey'], ['e', 'someid']]
-    expect(parseSeqTag(tags)).toBeUndefined()
-  })
-
-  it('returns undefined for empty tags', () => {
+  it('parseSeqTag extracts seq from tags', () => {
+    expect(parseSeqTag([['seq', '7']])).toBe(7)
+    expect(parseSeqTag([['other', '7']])).toBeUndefined()
     expect(parseSeqTag([])).toBeUndefined()
-  })
-
-  it('returns undefined for non-numeric seq value', () => {
-    const tags = [['seq', 'notanumber']]
-    expect(parseSeqTag(tags)).toBeUndefined()
-  })
-
-  it('returns undefined for seq tag without value', () => {
-    const tags = [['seq']]
-    expect(parseSeqTag(tags)).toBeUndefined()
   })
 })

@@ -1,0 +1,8 @@
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - cbor-extract
+  - core-js
+  - protobufjs
+  - re2
+  - sharp
+  - unrs-resolver

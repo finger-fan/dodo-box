@@ -9,6 +9,8 @@ services:
       - relay-data:/app/strfry-db
       - ./docker/strfry.conf:/app/strfry.conf:ro
     command: ["--config", "/app/strfry.conf", "relay"]
+    environment:
+      - TZ=Asia/Shanghai
     deploy:
       resources:
         limits:
@@ -27,7 +29,7 @@ services:
       start_period: 60s
 
   app:
-    image: dodo-box:${APP_VERSION:-latest}
+    image: dodo-box:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,9 +38,14 @@ services:
     ports:
       - "127.0.0.1:18300:3000"
     environment:
-      - NEXT_PUBLIC_DEFAULT_RELAYS=ws://relay:7777
+      - DEFAULT_RELAYS=ws://localhost:7777
       - NEXT_PUBLIC_VAULT_SALT=dodobox-vault-v1
       - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
+      - NEXT_PUBLIC_MOCK_TELEGRAM_TOKEN=mock-bot-token-12345
+      - MOCK_BOT_USERNAME=dodobox_bot
+      - MOCK_BOT_FIRST_NAME=DodoBox Bot
+      # Default message TTL in seconds (0 = permanent, 86400 = 1 day, 2592000 = 30 days)
+      - DEFAULT_MESSAGE_TTL=${DEFAULT_MESSAGE_TTL:-0}
     deploy:
       resources:
         limits:
