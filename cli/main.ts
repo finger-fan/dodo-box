@@ -6,14 +6,15 @@ import { homedir } from 'node:os'
 import crypto from 'node:crypto'
 import { createSession } from '@/lib/messaging/session'
 import { encryptSecret, decryptSecret } from '@/lib/messaging/vault-crypto-node'
-import { connectRelays, getStatus, getDefaultRelays } from './relay'
+import { connectToRelays, getRelayStatusMap } from '@/lib/messaging/relay-node'
+import { SocketStatus } from '@welshman/net'
 import { sendDirectMessage } from '@/lib/messaging/sender'
 import { startReceiving } from '@/lib/messaging/receiver'
 import type { ReceivedMessage } from '@/lib/messaging/receiver'
 import { fetchContacts, publishContacts, addContact as addContactToList, removeContact as removeContactFromList, listContacts, findContact, fetchRecentMessages } from '@/lib/messaging/contacts'
 import type { CliContact } from '@/lib/messaging/contacts'
 import { fetchProfile } from '@/lib/messaging/profile'
-import { initTracking, testAllRelays } from '@/lib/messaging/relay-quality'
+import { initTracking, testAllRelays, testRelayQuality } from '@/lib/messaging/relay-quality'
 import { initNodeEngine, destroyNodeEngine } from '@/lib/welshman/engine-node'
 import { deriveMasterKey } from '@/lib/nostr/key-derivation'
 import readline from 'node:readline'
@@ -21,6 +22,13 @@ import { createInterface } from 'node:readline'
 
 const CONFIG_DIR = join(homedir(), '.dodobox')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
+
+const DEFAULT_RELAYS = [
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://relay.nostr.band',
+  'wss://r1.fingerfan.top',
+]
 
 interface CliConfig {
   relays: string[]
@@ -92,7 +100,9 @@ async function main(): Promise<void> {
 
   // Load or create config
   const config = loadCliConfig()
-  const defaultRelays = getDefaultRelays()
+
+  // Merge user config relays + defaults (deduplicated)
+  const allRelays = [...new Set([...(config?.relays || []), ...DEFAULT_RELAYS])]
 
   // Get username
   const username = await ask('Username: ')
@@ -117,7 +127,7 @@ async function main(): Promise<void> {
 
     // Save relay config if not exists
     if (!config) {
-      saveCliConfig({ relays: defaultRelays })
+      saveCliConfig({ relays: DEFAULT_RELAYS })
     }
 
     console.log(`\n✅ Registered as @${username}`)
@@ -154,48 +164,23 @@ async function main(): Promise<void> {
     console.log(`   Pubkey: ${session.masterPubkey}\n`)
   }
 
-  // Connect to relays
-  const relays = config?.relays || defaultRelays
-  console.log(`Connecting to ${relays.length} relay(s)...\n`)
-  const statuses = await connectRelays(relays)
+  // Relay state — no auto-connect, user picks via /relay select
+  let selectedRelays: string[] = []
+  let receiver: AbortController | null = null
 
-  for (const s of statuses) {
-    console.log(`  ${s.connected ? '✅' : '❌'} ${s.url}${s.error ? ` (${s.error})` : ''}`)
-  }
-
-  const connectedCount = statuses.filter((s) => s.connected).length
-  if (connectedCount === 0) {
-    console.error('\n❌ Failed to connect to any relay. Exiting.\n')
-    process.exit(1)
-  }
-  console.log(`Connected to ${connectedCount}/${statuses.length} relays.\n`)
-
-  // Initialize relay quality tracking
-  initTracking(relays)
-
-  // Fetch contacts from relay (kind:3 NIP-02)
-  console.log('Fetching contacts from relay...')
-  let contacts: CliContact[] = await fetchContacts(session.masterPubkey, relays)
-  console.log(`  ${contacts.length} contact(s) loaded.\n`)
+  // Contacts — loaded after relay selection
+  let contacts: CliContact[] = []
+  const receivedMessages: ReceivedMessage[] = []
 
   // Currently selected contact (for direct text sending)
   let selectedContact: CliContact | null = null
 
-  // Start receiving messages
-  const receivedMessages: ReceivedMessage[] = []
   const onMessage = (msg: ReceivedMessage) => {
     receivedMessages.push(msg)
     const contact = contacts.find(c => c.pubkey === msg.senderPubkey)
     const senderName = contact?.name || msg.senderPubkey.slice(0, 8)
     console.log(`\n📨 From ${senderName}: "${msg.text}"\n> `)
   }
-
-  const receiver = startReceiving(
-    session.masterPubkey,
-    session.masterPrivkey,
-    relays,
-    onMessage
-  )
 
   // Interactive loop — persistent 'line' listener + input queue
   // so user input during `await sendDirectMessage(...)` is not lost.
@@ -219,8 +204,8 @@ async function main(): Promise<void> {
     return new Promise((resolve) => { inputResolver = resolve })
   }
 
-  console.log('Use /select <name> to pick a contact, then just type to chat.')
-  console.log('Commands: /me  /select  /contacts  /add  /remove  /status  /list  /profile  /quality  /help  /quit\n')
+  console.log('Type /relay list to see available relays, /relay select <index> to connect.')
+  console.log('Commands: /me  /select  /contacts  /add  /remove  /list  /profile  /history  /relay  /help  /quit\n')
 
   while (true) {
     const input = await getNextInput('> ')
@@ -250,13 +235,16 @@ Commands:
   /remove <pubkey>       Remove a contact
   /list                  Show last 20 received messages
   /profile <pubkey>      Lookup a user's profile
-  /quality               Test relay quality
+  /history <pubkey>      Show recent message history with a contact
+  /relay list            List all relays with index (selected marked with *)
+  /relay test <index>    Test a relay (0 = all)
+  /relay select <index>  Select relay for operations (0 = all)
   /status                Show relay connection status
   /quit                  Exit
 
 Tips:
+  - Use /relay select first to connect to relays
   - After /select, everything you type goes to that contact
-  - Or paste a 64-char hex pubkey to send a one-off message
   - Messages are sent via NIP-59 gift wrap (encrypted)
   - Contacts are stored on relay (kind:3 NIP-02)
 `)
@@ -264,9 +252,10 @@ Tips:
     }
 
     if (trimmed === '/status') {
-      const statuses = getStatus()
-      for (const s of statuses) {
-        console.log(`  ${s.connected ? '✅' : '❌'} ${s.url}`)
+      const map = getRelayStatusMap()
+      for (const url of allRelays) {
+        const connected = map.get(url) === SocketStatus.Open
+        console.log(`  ${connected ? '✅' : '❌'} ${url}`)
       }
       continue
     }
@@ -289,22 +278,24 @@ Tips:
     }
 
     if (trimmed.startsWith('/addnpub ') || trimmed.startsWith('/add ')) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const parts = input.trim().split(/\s+/)
       const identifier = parts[1]
       const name = parts.slice(2).join(' ') || undefined
       const updated = addContactToList(contacts, identifier, name)
       if (updated) {
         contacts = updated
-        await publishContacts(contacts, session.masterPrivkey, relays)
+        await publishContacts(contacts, session.masterPrivkey, selectedRelays)
         console.log('  📤 Contacts synced to relay.')
       }
       continue
     }
 
     if (trimmed.startsWith('/remove ')) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const pubkey = input.trim().slice(8).trim()
       contacts = removeContactFromList(contacts, pubkey)
-      await publishContacts(contacts, session.masterPrivkey, relays)
+      await publishContacts(contacts, session.masterPrivkey, selectedRelays)
       console.log('  📤 Contacts synced to relay.')
       continue
     }
@@ -340,13 +331,14 @@ Tips:
     }
 
     if (trimmed.startsWith('/profile ')) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const pubkey = trimmed.slice(9).trim()
       if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
         console.log('  ❌ Invalid pubkey format\n')
         continue
       }
       console.log(`  Looking up profile for ${pubkey.slice(0, 16)}...`)
-      const profile = await fetchProfile(pubkey, relays)
+      const profile = await fetchProfile(pubkey, selectedRelays)
 
       if (!profile) {
         console.log('  No profile information found.\n')
@@ -369,6 +361,7 @@ Tips:
     }
 
     if (trimmed.startsWith('/history ')) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const pubkey = trimmed.slice(9).trim()
       if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
         console.log('  ❌ Invalid pubkey format\n')
@@ -379,7 +372,7 @@ Tips:
       const messages = await fetchRecentMessages(
         session.masterPubkey,
         pubkey,
-        relays,
+        selectedRelays,
         session.masterPrivkey,
         20
       )
@@ -398,16 +391,116 @@ Tips:
       continue
     }
 
-    if (trimmed === '/quality') {
-      await testAllRelays(session.masterPrivkey)
+    if (trimmed === '/relay list') {
+      const map = getRelayStatusMap()
+      console.log('')
+      for (let i = 0; i < allRelays.length; i++) {
+        const url = allRelays[i]
+        const connected = map.get(url) === SocketStatus.Open
+        const selected = selectedRelays.includes(url) ? '*' : ' '
+        console.log(`  ${i + 1}. ${connected ? '✅' : '❌'}${selected} ${url}`)
+      }
+      if (selectedRelays.length === 0) {
+        console.log('  No relay selected. Use /relay select <index>.')
+      } else if (selectedRelays.length === allRelays.length) {
+        console.log('  Using all relays.')
+      } else {
+        console.log(`  Using: ${selectedRelays.join(', ')}`)
+      }
+      console.log('')
+      continue
+    }
+
+    if (trimmed.startsWith('/relay test ') || trimmed === '/relay test') {
+      const arg = trimmed.slice(12).trim()
+      if (!arg || arg === '0') {
+        // Test all
+        initTracking(allRelays)
+        await testAllRelays(session.masterPrivkey)
+        continue
+      }
+      const index = parseInt(arg, 10)
+      if (isNaN(index) || index < 1 || index > allRelays.length) {
+        console.log(`  ❌ Invalid index. Use 0-${allRelays.length} (0 = all)\n`)
+        continue
+      }
+      const url = allRelays[index - 1]
+      initTracking([url])
+      console.log(`  Testing ${url}...`)
+      const quality = await testRelayQuality(url, session.masterPrivkey)
+      const icon = quality.successRate >= 0.8 ? '✅' : quality.successRate > 0 ? '⚠️' : '❌'
+      console.log(`  ${icon} Latency: ${quality.avgLatencyMs}ms | Success: ${(quality.successRate * 100).toFixed(0)}%\n`)
+      continue
+    }
+
+    if (trimmed.startsWith('/relay select ') || trimmed === '/relay select') {
+      const arg = trimmed.slice(14).trim()
+      if (!arg) {
+        // Show current selection
+        if (selectedRelays.length === 0) {
+          console.log('  No relay selected. Use /relay select <index> (0 = all).\n')
+        } else if (selectedRelays.length === allRelays.length) {
+          console.log('  Using all relays.\n')
+        } else {
+          console.log(`  Using: ${selectedRelays.join(', ')}\n`)
+        }
+        continue
+      }
+      const index = parseInt(arg, 10)
+      if (isNaN(index) || index < 0 || index > allRelays.length) {
+        console.log(`  ❌ Invalid index. Use 0-${allRelays.length} (0 = all)\n`)
+        continue
+      }
+
+      // Stop existing receiver if any
+      if (receiver) { receiver.abort(); receiver = null }
+
+      if (index === 0) {
+        selectedRelays = [...allRelays]
+      } else {
+        selectedRelays = [allRelays[index - 1]]
+      }
+
+      console.log(`  Connecting to ${selectedRelays.length} relay(s)...`)
+      connectToRelays(selectedRelays)
+      await new Promise((r) => setTimeout(r, 2000))
+
+      const map = getRelayStatusMap()
+      const connected = selectedRelays.filter(u => map.get(u) === SocketStatus.Open)
+      for (const url of selectedRelays) {
+        console.log(`  ${map.get(url) === SocketStatus.Open ? '✅' : '❌'} ${url}`)
+      }
+
+      if (connected.length === 0) {
+        console.log('  ❌ Failed to connect to any selected relay.\n')
+        selectedRelays = []
+        continue
+      }
+
+      initTracking(selectedRelays)
+
+      // Fetch contacts
+      console.log('  Fetching contacts...')
+      contacts = await fetchContacts(session.masterPubkey, selectedRelays)
+      console.log(`  ${contacts.length} contact(s) loaded.`)
+
+      // Start receiving
+      receiver = startReceiving(session.masterPubkey, session.masterPrivkey, selectedRelays, onMessage)
+
+      if (selectedRelays.length === allRelays.length) {
+        console.log('  ✅ Using all relays.\n')
+      } else {
+        console.log(`  ✅ Using: ${selectedRelays[0]}\n`)
+      }
       continue
     }
 
     // If a contact is selected, send text directly to them
     if (selectedContact && !trimmed.startsWith('/')) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const text = input.trim()
       console.log(`  Sending to ${selectedContact.name}...`)
-      const result = await sendDirectMessage(text, selectedContact.pubkey, session.masterPrivkey, relays)
+      const result = await sendDirectMessage(text, selectedContact.pubkey, session.masterPrivkey, selectedRelays)
 
       if (result.success) {
         console.log(`  ✅ Sent! (${result.relayCount} relays)\n`)
@@ -419,10 +512,11 @@ Tips:
 
     // Try to parse as a 64-char hex pubkey (one-off send)
     if (/^[0-9a-f]{64}$/i.test(trimmed)) {
+      if (selectedRelays.length === 0) { console.log('  ❌ No relay selected. Use /relay select <index> first.\n'); continue }
       const recipient = trimmed
       console.log(`\nSending to ${recipient.slice(0, 16)}...`)
       const text = await getNextInput('  Message: ')
-      const result = await sendDirectMessage(text, recipient, session.masterPrivkey, relays)
+      const result = await sendDirectMessage(text, recipient, session.masterPrivkey, selectedRelays)
 
       if (result.success) {
         console.log(`  ✅ Sent! Event: ${result.eventId.slice(0, 16)}... (${result.relayCount} relays)\n`)
@@ -436,7 +530,7 @@ Tips:
 
   // Cleanup
   rl.close()
-  receiver.abort()
+  receiver?.abort()
   destroyNodeEngine()
   console.log('\nGoodbye!\n')
 }

@@ -8,7 +8,7 @@ cd /Users/david/_projects/2_personal/projects/dodo-box
 
 # 1. Start relay
 echo "Starting local relay..."
-docker compose up -d relay
+docker compose -f docker/docker-compose.yml up -d relay
 
 # Wait for relay
 sleep 3

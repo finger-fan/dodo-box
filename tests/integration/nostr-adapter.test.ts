@@ -1,5 +1,5 @@
 // Integration test: RealNostrAdapter via local strfry relay
-// Requires: docker compose -f docker-compose.test.yml up -d
+// Requires: docker compose -f docker/docker-compose.test.yml up -d
 
 import { describe, it, expect, beforeAll } from 'vitest'
 const WS = require('ws')

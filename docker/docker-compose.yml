@@ -1,3 +1,5 @@
+name: dodo-box
+
 services:
   relay:
     image: ghcr.io/hoytech/strfry:latest
@@ -7,7 +9,7 @@ services:
       - "127.0.0.1:7777:7777"
     volumes:
       - relay-data:/app/strfry-db
-      - ./docker/strfry.conf:/app/strfry.conf:ro
+      - ./strfry.conf:/app/strfry.conf:ro
     command: ["--config", "/app/strfry.conf", "relay"]
     environment:
       - TZ=Asia/Shanghai
@@ -31,7 +33,7 @@ services:
   app:
     image: dodo-box:latest
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: dodo-box-app
     restart: unless-stopped
@@ -73,8 +75,8 @@ services:
     ports:
       - "127.0.0.1:18301:80"
     volumes:
-      - ./site:/usr/share/nginx/html:ro
-      - ./site/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../site:/usr/share/nginx/html:ro
+      - ../site/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     deploy:
       resources:
         limits:

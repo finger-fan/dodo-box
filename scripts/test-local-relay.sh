@@ -14,7 +14,7 @@ echo "=========================================="
 # 1. 启动 relay
 echo "[1/3] 启动本地 relay..."
 cd "$PROJECT_ROOT"
-docker compose up -d relay 2>/dev/null || {
+docker compose -f docker/docker-compose.yml up -d relay 2>/dev/null || {
     echo "❌ Docker 启动失败，请确保 Docker Desktop 已运行"
     exit 1
 }

@@ -1,3 +1,5 @@
+name: dodo-box-test
+
 services:
   relay:
     image: ghcr.io/hoytech/strfry:latest
@@ -7,7 +9,7 @@ services:
       - "127.0.0.1:7778:7777"
     volumes:
       - relay-test-data:/app/strfry-db
-      - ./docker/strfry.conf:/app/strfry.conf:ro
+      - ./strfry.conf:/app/strfry.conf:ro
     command: ["--config", "/app/strfry.conf", "relay"]
     deploy:
       resources:

@@ -25,7 +25,7 @@ async function isRelayReady(): Promise<boolean> {
 }
 
 export default async function setup() {
-  const composeFile = resolve('docker-compose.test.yml')
+  const composeFile = resolve('docker/docker-compose.test.yml')
 
   try {
     execSync('docker compose --version', { stdio: 'ignore' })

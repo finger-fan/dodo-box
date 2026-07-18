@@ -9,7 +9,7 @@
 
 ```bash
 # 构建并启动所有服务
-docker compose up -d --build
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
 服务启动后：
@@ -29,7 +29,7 @@ docker compose up -d --build
 | `MOCK_BOT_USERNAME` | `dodobox_bot` | Mock bot 用户名 |
 | `MOCK_BOT_FIRST_NAME` | `DodoBox Bot` | Mock bot 显示名称 |
 
-在 `docker-compose.yml` 中修改 `environment` 部分即可调整。
+在 `docker/docker-compose.yml` 中修改 `environment` 部分即可调整。
 
 ## 3. 本地开发
 
@@ -73,13 +73,17 @@ pnpm check            # tsc --noEmit + eslint
 
 ### 集成测试 relay
 
-`docker-compose.test.yml` 提供 strfry relay 在端口 7778，供 Vitest 集成测试使用。测试的 `global-setup.ts` 会自动启动、`global-teardown.ts` 会自动停止。
+`docker/docker-compose.test.yml` 提供 strfry relay 在端口 7778，供 Vitest 集成测试使用。测试的 `global-setup.ts` 会自动启动、`global-teardown.ts` 会自动停止。
+
+### VPS 独立部署 relay
+
+生产环境在 VPS 上单独运行 relay（Nginx 反代 + WSS）使用 `docker/docker-compose.relay.yml`，完整步骤见 [relay-vps-deployment.md](./relay-vps-deployment.md)。
 
 ## 5. 验证部署
 
 ```bash
 # 检查服务状态
-docker compose ps
+docker compose -f docker/docker-compose.yml ps
 
 # 检查健康
 curl http://127.0.0.1:18300/api/health
@@ -88,16 +92,16 @@ curl http://127.0.0.1:18300/api/health
 curl http://127.0.0.1:18300/api/config
 
 # 查看日志
-docker compose logs app
-docker compose logs relay
+docker compose -f docker/docker-compose.yml logs app
+docker compose -f docker/docker-compose.yml logs relay
 ```
 
 ## 6. 停止与清理
 
 ```bash
 # 停止服务
-docker compose down
+docker compose -f docker/docker-compose.yml down
 
 # 停止并删除数据卷
-docker compose down -v
+docker compose -f docker/docker-compose.yml down -v
 ```

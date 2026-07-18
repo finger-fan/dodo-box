@@ -1,0 +1,47 @@
+# docker-compose.relay.yml — VPS 生产部署用的 Nostr relay（strfry）
+#
+# 用法（在仓库根目录执行）：
+#   docker compose -f docker/docker-compose.relay.yml up -d
+#
+# 端口绑定说明：
+#   默认绑定 127.0.0.1，relay 不直接暴露公网——由同一台 VPS 上的 Nginx
+#   终结 TLS 后以 wss:// 对外提供（推荐，见 docs/relay-vps-deployment.md）。
+#   仅当 Nginx 在另一台机器或另一个 Docker 网络里时，才需要：
+#     RELAY_BIND=0.0.0.0 docker compose -f docker/docker-compose.relay.yml up -d
+#   此时务必用防火墙/云安全组把 7777 限制为仅 Nginx 来源可访问。
+
+name: dodo-box
+
+services:
+  relay:
+    image: ghcr.io/hoytech/strfry:latest
+    container_name: dodo-box-relay
+    restart: unless-stopped
+    ports:
+      - "${RELAY_BIND:-127.0.0.1}:7777:7777"
+    volumes:
+      - relay-data:/app/strfry-db
+      - ./strfry.conf:/app/strfry.conf:ro
+    command: ["--config", "/app/strfry.conf", "relay"]
+    environment:
+      - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7777 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  relay-data:
+    driver: local
