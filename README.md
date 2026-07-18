@@ -89,3 +89,29 @@ npm run dev
 | `GEMINI_API_KEY` | Gemini AI API 密钥（AI Studio 注入） |
 | `APP_URL` | 托管 URL（AI Studio 注入） |
 | `DISABLE_HMR` | 设为 `"true"` 禁用热模块替换 |
+
+
+ 使用方法
+
+在需要允许截屏的页面中调用：
+import { disablePrivacy, enablePrivacy } from '@/lib/privacy-screen';
+
+  useEffect(() => {
+    disablePrivacy();
+    return () => { enablePrivacy(); };
+  }, []);
+
+
+
+
+nslookup 186.241.72.33.sslip.io
+Server:		8.8.8.8
+Address:	8.8.8.8#53
+
+Non-authoritative answer:
+Name:	186.241.72.33.sslip.io
+Address: 186.241.72.33
+
+
+http://186.241.72.33.sslip.io/download/index.html
+
