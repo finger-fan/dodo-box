@@ -3,6 +3,9 @@
 本文档配套 `docker/docker-compose.relay.yml` 使用，目标：在 VPS 上跑一个 strfry relay，
 通过 Nginx 以 `wss://relay.example.com` 对外提供（TLS 由 Nginx 终结）。
 
+如果你的域名已托管在 Cloudflare，可以跳过 certbot，直接走第 10 节的
+「Cloudflare 代理变体」（免证书管理、隐藏源站 IP）。
+
 ```
 浏览器/APP  ──wss(443)──▶  Nginx  ──ws(127.0.0.1:7777)──▶  strfry 容器
 ```
@@ -142,3 +145,63 @@ docker run --rm -v dodo-box_relay-data:/data -v "$PWD":/backup alpine \
 来源全是 `127.0.0.1`。如果以后要启用按 IP 限流（`maxIpsPerRequest`），把它改成
 `"X-Forwarded-For"` 即可（上面的 Nginx 配置已经转发该头）。当前限流为 0（不限），
 不改也能正常跑。
+
+## 10. 变体：域名托管在 Cloudflare（橙色云代理，隐藏源站 IP）
+
+已有域名托管在 Cloudflare 时，可以不走 certbot / Let's Encrypt，利用 CF 的
+WebSocket 代理（免费版即支持，无需开通）：
+
+```
+APK ──wss──▶ CF 边缘（终结 TLS，客户端看到 CF 的合法证书）
+               │
+               └──回源──▶ VPS Nginx ──ws──▶ strfry（127.0.0.1）
+```
+
+### 步骤
+
+1. **DNS**：CF 仪表盘加 A 记录 `relay.example.com` → VPS IP，保持橙色云（Proxied）。
+   源站 IP 对客户端全程隐藏。
+2. **SSL/TLS 模式**（SSL/TLS → Overview）：
+   - **Full**：回源加密，但 CF **不校验源站证书**——源站 Nginx 挂自签名证书即可，
+     客户端（APK/浏览器）看到的永远是 CF 的合法证书，**客户端零改动**。
+   - **Full (Strict)**（推荐的最终形态）：源站安装 CF 的 **Origin Certificate**
+     （SSL/TLS → Origin Server → Create Certificate，免费、15 年有效、只有 CF 信任、
+     无需自动续期）。
+   - **不要选 Flexible**（回源明文）。
+3. **源站证书**：
+   - Full 模式自签一张即可：
+     ```bash
+     openssl req -x509 -newkey rsa:2048 -nodes \
+       -keyout /etc/nginx/ssl/relay-key.pem \
+       -out /etc/nginx/ssl/relay-cert.pem \
+       -days 3650 -subj "/CN=relay.example.com"
+     ```
+   - Full (Strict)：在 CF 仪表盘创建 Origin Cert，把 cert/key 放到 VPS（如 `/etc/nginx/ssl/`）。
+4. **Nginx 配置**：与第 4 节完全相同（Upgrade/Connection/长超时三件套），
+   `ssl_certificate` 指向上面的文件。**不再需要 80 端口和 certbot**。
+5. **防火墙**：443 仅对 Cloudflare IP 段放行（<https://www.cloudflare.com/ips/>，
+   可写定时任务同步），防止他人扫到源站 IP 后绕过 CF 直连。
+6. **relay 地址**：`wss://relay.example.com`。
+
+### 注意
+
+- **空闲超时**：CF 免费版 WS 双向约 100 秒无数据会断连。有消息流量不触发；
+  客户端 welshman 有自动重连兜底。若观察到周期性 ~100s 断线，需检查
+  relay/客户端的 ping 保活间隔（要 < 100s）。
+- **ToS**：CF 免费版条款 2.8 原则上限制「主要传输非 HTML 内容」。实践中大量
+  API / Nostr relay 跑在免费版上，个人小流量风险很低，但条款存在，自行权衡。
+
+### 进一步：源站完全不开入站端口（Cloudflare Tunnel）
+
+如果 VPS 没有公网入站能力（NAT、CGNAT、境内宽带、不想暴露任何端口），
+改用 **cloudflared**（Cloudflare Tunnel）：VPS 上的 cloudflared 主动向外拨号到 CF，
+CF 把 wss 流量经隧道送回源站。零入站端口、原生支持 WebSocket、免费。
+文档：<https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/>
+
+### 不推荐：在边缘节点（CF Workers / Deno Deploy）写脚本转发 WS
+
+技术上可行（Workers 的 WebSocketPair、Deno 的 `Deno.upgradeWebSocket` 都支持
+入站 + 出站 WS），但它只是重复了橙色云代理已经免费提供的功能（隐藏源站 + 合法
+证书），还引入新麻烦：边缘 → VPS 这一跳要么走明文 `ws://`（VPS 需暴露 7777），
+要么 `wss://` 到有效证书（自签名证书边缘平台默认不信任）——证书问题只是被挪了
+位置，没有消失。只有当你需要在边缘做鉴权、限流、多 relay 路由等逻辑时才值得写。

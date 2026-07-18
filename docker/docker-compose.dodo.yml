@@ -18,7 +18,7 @@ services:
     container_name: dodo-box-relay
     restart: unless-stopped
     ports:
-      - "${RELAY_BIND:-127.0.0.1}:7777:7777"
+      - "${RELAY_BIND:-127.0.0.1}:18303:7777"
     volumes:
       - relay-data:/app/strfry-db
       - ./strfry.conf:/app/strfry.conf:ro
@@ -41,6 +41,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+  download:
+    image: nginx:alpine
+    container_name: dodo-box-download
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18302:80"
+    volumes:
+      - ./download-site:/usr/share/nginx/html:ro
+      - ./download-site/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   relay-data:

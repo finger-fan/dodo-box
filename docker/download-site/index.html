@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodo Box - Android 下载</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:2rem 1rem}
+.container{max-width:600px;margin:0 auto}
+header{text-align:center;color:#fff;margin-bottom:2rem}
+header h1{font-size:2rem;margin-bottom:.5rem}
+header p{opacity:.9;font-size:.9rem}
+.list{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.item{padding:1.25rem 1.5rem;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.item:hover{background:#f8f9fa}
+.item:last-child{border-bottom:none}
+.info{flex:1}
+.ver{font-weight:600;font-size:1.1rem;color:#333}
+.tag{background:#667eea;color:#fff;font-size:.7rem;padding:.15rem .5rem;border-radius:10px;margin-left:.5rem}
+.date{display:block;font-size:.85rem;color:#666;margin-top:.25rem}
+.btn{background:#667eea;color:#fff;text-decoration:none;padding:.6rem 1.2rem;border-radius:8px;font-size:.9rem;font-weight:500;white-space:nowrap}
+.btn:hover{background:#5a6fd6}
+.more{display:block;width:100%;padding:1rem;background:#f8f9fa;border:none;border-top:1px solid #eee;color:#667eea;font-size:.9rem;font-weight:500;cursor:pointer}
+.more:hover{background:#eef0f2}
+.empty{padding:3rem;text-align:center;color:#999}
+footer{text-align:center;color:#fff;margin-top:2rem;font-size:.8rem;opacity:.8}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📦 Dodo Box</h1>
+    <p>Android 版本下载</p>
+  </header>
+  <div class="list" id="list"><div class="empty">加载中…</div></div>
+  <footer><p>Dodo Box &copy; 2026</p></footer>
+</div>
+<script>
+(async () => {
+  const res = await fetch('./versions.json?t=' + Date.now());
+  const versions = await res.json();
+  const list = document.getElementById('list');
+
+  if (!versions.length) {
+    list.innerHTML = '<div class="empty">暂无可用版本</div>';
+    return;
+  }
+
+  const item = (v, i) => `
+    <div class="item">
+      <div class="info">
+        <span class="ver">v${v.version}${i === 0 ? '<span class="tag">最新</span>' : ''}</span>
+        <span class="date">${v.date}</span>
+      </div>
+      <a class="btn" href="./apk/${v.file}">下载 APK</a>
+    </div>`;
+
+  const latest = versions.slice(0, 3).map((v, i) => item(v, i)).join('');
+  const older = versions.slice(3);
+
+  list.innerHTML = latest;
+
+  if (older.length) {
+    const olderHtml = older.map((v, i) => item(v, i + 3)).join('');
+    list.insertAdjacentHTML('afterend',
+      `<div id="older" style="display:none" class="list">${olderHtml}</div>
+       <button class="more" onclick="var o=document.getElementById('older');if(o.style.display==='none'){o.style.display='block';this.textContent='收起 ↑'}else{o.style.display='none';this.textContent='显示更多版本 ↓'}">显示更多版本 ↓</button>`
+    );
+  }
+})();
+</script>
+</body>
+</html>
