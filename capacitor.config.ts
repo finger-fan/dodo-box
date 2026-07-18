@@ -8,6 +8,9 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
   },
   plugins: {
+    PrivacyScreen: {
+      enable: true,
+    },
     CapacitorUpdater: {
       autoUpdate: false,
     },

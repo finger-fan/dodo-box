@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.2.0",
+    "@capacitor/privacy-screen": "^2.0.1",
     "@capgo/capacitor-updater": "^8.43.11",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
