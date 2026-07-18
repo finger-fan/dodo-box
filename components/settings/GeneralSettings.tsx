@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Globe, Moon, Shield, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
-import { SocketStatus } from '@welshman/net';
 import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
-import { getRelayStatusMap } from '@/lib/welshman/relay-manager';
+import { getStatusMap, initRelayManager } from '@/lib/welshman/relay-manager';
+import type { RelayStatus } from '@/lib/welshman/relay-manager';
 import { getDefaultRelays, getUserRelays, setUserRelays } from '@/lib/runtime-config';
 
 interface GeneralSettingsProps {
@@ -33,14 +33,24 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
   });
   const [isEditingRelays, setIsEditingRelays] = useState(false);
   const [relayInput, setRelayInput] = useState(() => relays.join('\n'));
-  const [statusMap, setStatusMap] = useState<Map<string, SocketStatus>>(new Map());
+  const [statusMap, setStatusMap] = useState<Map<string, RelayStatus>>(() => {
+    if (typeof window === 'undefined') return new Map();
+    return getStatusMap();
+  });
+
+  // Subscribe to real-time relay status changes instead of polling
+  const handleStatusChange = useCallback((url: string, status: RelayStatus) => {
+    setStatusMap(prev => {
+      const next = new Map(prev);
+      next.set(url, status);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    const update = () => setStatusMap(getRelayStatusMap());
-    update();
-    const id = setInterval(update, 3000);
-    return () => clearInterval(id);
-  }, []);
+    initRelayManager({ onStatusChange: handleStatusChange });
+    return () => { initRelayManager({ onStatusChange: undefined }); };
+  }, [handleStatusChange]);
 
   const currentLang = (i18n.resolvedLanguage || i18n.language || 'zh').startsWith('zh') ? 'zh' : 'en';
 
@@ -68,9 +78,9 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
     onToast?.(t('settings.relays_updated'), 'success');
   };
 
-  function getStatusColor(status?: SocketStatus) {
-    if (status === SocketStatus.Open) return 'bg-emerald-500';
-    if (status === SocketStatus.Opening) return 'bg-amber-500';
+  function getStatusColor(status?: RelayStatus) {
+    if (status === 'connected') return 'bg-emerald-500';
+    if (status === 'connecting') return 'bg-amber-500';
     return 'bg-red-500';
   }
 
@@ -158,7 +168,7 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
               <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
                 <span>{relay}</span>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] capitalize">{statusMap.get(relay) || 'disconnected'}</span>
+                  <span className="text-[10px] capitalize">{statusMap.get(relay) || 'closed'}</span>
                   <div className={cn('w-1.5 h-1.5 rounded-full', getStatusColor(statusMap.get(relay)))} />
                 </div>
               </div>

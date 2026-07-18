@@ -1,7 +1,7 @@
 // quality.ts — Relay quality monitoring for CLI
 // Tracks latency and success rate per relay
 
-import { connectToRelays, publishEvent } from './relay-node'
+import { connectToRelays, publishEvent } from '@/lib/welshman/relay-manager'
 import type { SignedEvent } from '@welshman/util'
 
 export interface RelayQuality {

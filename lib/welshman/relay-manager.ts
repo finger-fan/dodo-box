@@ -1,14 +1,65 @@
 // relay-manager.ts - Welshman Pool/Socket based relay management
-// Replaces lib/nostr/relay-client.ts
+// Shared by web and CLI. Both use the same engine singletons.
 
 import { publish, request, Tracker } from '@welshman/net'
 import type { Filter, TrustedEvent, SignedEvent } from '@welshman/util'
 import type { PublishResultsByRelay } from '@welshman/net'
-import { getPool, getTracker, getRepository } from './engine'
+import { getPool, getTracker } from './engine'
 import { SocketStatus } from '@welshman/net'
 import { SocketEvent } from '@welshman/net'
 
 const DEFAULT_REQUEST_TIMEOUT = 8000
+
+// ── Status Callback ──────────────────────────────────────────────
+
+export type RelayStatus = 'connecting' | 'connected' | 'failed' | 'closed'
+
+export type OnRelayStatusChange = (url: string, status: RelayStatus) => void
+
+export interface RelayManagerOptions {
+  onStatusChange?: OnRelayStatusChange
+}
+
+let onStatusChange: OnRelayStatusChange | undefined
+const relayStatusMap = new Map<string, RelayStatus>()
+const trackedSocketUrls = new Set<string>()
+
+function mapSocketStatus(s: SocketStatus): RelayStatus {
+  switch (s) {
+    case SocketStatus.Opening: return 'connecting'
+    case SocketStatus.Open:    return 'connected'
+    case SocketStatus.Error:   return 'failed'
+    default:                   return 'closed'
+  }
+}
+
+/**
+ * Initialize relay manager with optional status-change callback.
+ * Call once before connecting to relays. Safe to call multiple times.
+ */
+export function initRelayManager(options?: RelayManagerOptions): void {
+  if (options?.onStatusChange) {
+    onStatusChange = options.onStatusChange
+  }
+}
+
+/**
+ * Get a snapshot of current relay statuses (our mapped type).
+ */
+export function getStatusMap(): Map<string, RelayStatus> {
+  // Merge pool state for any sockets we haven't tracked yet
+  const pool = getPool()
+  if (pool) {
+    for (const [url, socket] of pool._data.entries()) {
+      if (!relayStatusMap.has(url)) {
+        relayStatusMap.set(url, mapSocketStatus(socket.status))
+      }
+    }
+  }
+  return new Map(relayStatusMap)
+}
+
+// ── Core Operations ──────────────────────────────────────────────
 
 /**
  * Ensure sockets are opened for the given relay URLs.
@@ -19,6 +70,19 @@ export function connectToRelays(relayUrls: readonly string[]): void {
   if (!pool) throw new Error('Pool not initialized')
   for (const url of relayUrls) {
     const socket = pool.get(url)
+
+    // Register status listener once per URL
+    if (!trackedSocketUrls.has(url)) {
+      trackedSocketUrls.add(url)
+      relayStatusMap.set(url, mapSocketStatus(socket.status))
+
+      socket.on(SocketEvent.Status, (status: SocketStatus) => {
+        const rs = mapSocketStatus(status)
+        relayStatusMap.set(url, rs)
+        onStatusChange?.(url, rs)
+      })
+    }
+
     if (socket.status === SocketStatus.Closed || socket.status === SocketStatus.Error) {
       socket.open()
     }
@@ -126,6 +190,8 @@ export function closeAllRelays(): void {
   const pool = getPool()
   if (!pool) return
   pool.clear()
+  trackedSocketUrls.clear()
+  relayStatusMap.clear()
 }
 
 /**
@@ -144,7 +210,7 @@ export function getFailedRelays(): string[] {
 }
 
 /**
- * Get a map of all known relay URLs to their current connection status.
+ * Get a map of all known relay URLs to their current SocketStatus.
  */
 export function getRelayStatusMap(): Map<string, SocketStatus> {
   const pool = getPool()

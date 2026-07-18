@@ -6,15 +6,15 @@ import { homedir } from 'node:os'
 import crypto from 'node:crypto'
 import { createSession } from '@/lib/messaging/session'
 import { encryptSecret, decryptSecret } from '@/lib/messaging/vault-crypto-node'
-import { connectToRelays, getRelayStatusMap } from '@/lib/messaging/relay-node'
-import { SocketStatus } from '@welshman/net'
+import { connectToRelays, initRelayManager, waitForRelayConnection, getStatusMap } from '@/lib/welshman/relay-manager'
+import type { RelayStatus } from '@/lib/welshman/relay-manager'
 import { sendDirectMessage } from '@/lib/messaging/sender'
 import { startReceiving } from '@/lib/messaging/receiver'
 import type { ReceivedMessage } from '@/lib/messaging/receiver'
 import { fetchContacts, publishContacts, addContact as addContactToList, removeContact as removeContactFromList, listContacts, findContact, fetchRecentMessages } from '@/lib/messaging/contacts'
 import type { CliContact } from '@/lib/messaging/contacts'
 import { fetchProfile } from '@/lib/messaging/profile'
-import { initTracking, testAllRelays, testRelayQuality } from '@/lib/messaging/relay-quality'
+import { initTracking } from '@/lib/messaging/relay-quality'
 import { initNodeEngine, destroyNodeEngine } from '@/lib/welshman/engine-node'
 import { deriveMasterKey } from '@/lib/nostr/key-derivation'
 import readline from 'node:readline'
@@ -97,6 +97,16 @@ async function main(): Promise<void> {
 
   // Init Node.js engine (no IndexedDB)
   initNodeEngine()
+
+  // Init relay status callbacks for real-time connection feedback
+  const statusIcon = (s: RelayStatus) =>
+    s === 'connected' ? '✅' : s === 'failed' ? '❌' : s === 'connecting' ? '🔄' : '⏹️'
+
+  initRelayManager({
+    onStatusChange: (url: string, status: RelayStatus) => {
+      console.log(`  ${statusIcon(status)} ${url}: ${status}`)
+    }
+  })
 
   // Load or create config
   const config = loadCliConfig()
@@ -204,7 +214,7 @@ async function main(): Promise<void> {
     return new Promise((resolve) => { inputResolver = resolve })
   }
 
-  console.log('Type /relay list to see available relays, /relay select <index> to connect.')
+  console.log('Type /relay status to see available relays, /relay select <index> to connect.')
   console.log('Commands: /me  /select  /contacts  /add  /remove  /list  /profile  /history  /relay  /help  /quit\n')
 
   while (true) {
@@ -236,10 +246,8 @@ Commands:
   /list                  Show last 20 received messages
   /profile <pubkey>      Lookup a user's profile
   /history <pubkey>      Show recent message history with a contact
-  /relay list            List all relays with index (selected marked with *)
-  /relay test <index>    Test a relay (0 = all)
-  /relay select <index>  Select relay for operations (0 = all)
-  /status                Show relay connection status
+  /relay status          List all relays with connection status
+  /relay select <index>  Select relay(s) to connect (0 = all, comma-separated)
   /quit                  Exit
 
 Tips:
@@ -252,10 +260,10 @@ Tips:
     }
 
     if (trimmed === '/status') {
-      const map = getRelayStatusMap()
+      const map = getStatusMap()
       for (const url of allRelays) {
-        const connected = map.get(url) === SocketStatus.Open
-        console.log(`  ${connected ? '✅' : '❌'} ${url}`)
+        const status = map.get(url) || 'closed'
+        console.log(`  ${statusIcon(status)} ${url}`)
       }
       continue
     }
@@ -391,14 +399,14 @@ Tips:
       continue
     }
 
-    if (trimmed === '/relay list') {
-      const map = getRelayStatusMap()
+    if (trimmed === '/relay status' || trimmed === '/relay list') {
+      const map = getStatusMap()
       console.log('')
       for (let i = 0; i < allRelays.length; i++) {
         const url = allRelays[i]
-        const connected = map.get(url) === SocketStatus.Open
+        const status = map.get(url) || 'closed'
         const selected = selectedRelays.includes(url) ? '*' : ' '
-        console.log(`  ${i + 1}. ${connected ? '✅' : '❌'}${selected} ${url}`)
+        console.log(`  ${i + 1}. ${statusIcon(status)}${selected} ${url}`)
       }
       if (selectedRelays.length === 0) {
         console.log('  No relay selected. Use /relay select <index>.')
@@ -411,34 +419,12 @@ Tips:
       continue
     }
 
-    if (trimmed.startsWith('/relay test ') || trimmed === '/relay test') {
-      const arg = trimmed.slice(12).trim()
-      if (!arg || arg === '0') {
-        // Test all
-        initTracking(allRelays)
-        await testAllRelays(session.masterPrivkey)
-        continue
-      }
-      const index = parseInt(arg, 10)
-      if (isNaN(index) || index < 1 || index > allRelays.length) {
-        console.log(`  ❌ Invalid index. Use 0-${allRelays.length} (0 = all)\n`)
-        continue
-      }
-      const url = allRelays[index - 1]
-      initTracking([url])
-      console.log(`  Testing ${url}...`)
-      const quality = await testRelayQuality(url, session.masterPrivkey)
-      const icon = quality.successRate >= 0.8 ? '✅' : quality.successRate > 0 ? '⚠️' : '❌'
-      console.log(`  ${icon} Latency: ${quality.avgLatencyMs}ms | Success: ${(quality.successRate * 100).toFixed(0)}%\n`)
-      continue
-    }
-
     if (trimmed.startsWith('/relay select ') || trimmed === '/relay select') {
       const arg = trimmed.slice(14).trim()
       if (!arg) {
         // Show current selection
         if (selectedRelays.length === 0) {
-          console.log('  No relay selected. Use /relay select <index> (0 = all).\n')
+          console.log('  No relay selected. Use /relay select <index> (0 = all, comma-separated).\n')
         } else if (selectedRelays.length === allRelays.length) {
           console.log('  Using all relays.\n')
         } else {
@@ -446,30 +432,29 @@ Tips:
         }
         continue
       }
-      const index = parseInt(arg, 10)
-      if (isNaN(index) || index < 0 || index > allRelays.length) {
-        console.log(`  ❌ Invalid index. Use 0-${allRelays.length} (0 = all)\n`)
+
+      // Parse indices: support comma-separated (e.g. "1,2,4")
+      const indices = arg.split(',').map(s => parseInt(s.trim(), 10))
+      if (indices.some(i => isNaN(i) || i < 0 || i > allRelays.length)) {
+        console.log(`  ❌ Invalid index. Use 0-${allRelays.length} (0 = all, comma-separated)\n`)
         continue
       }
 
       // Stop existing receiver if any
       if (receiver) { receiver.abort(); receiver = null }
 
-      if (index === 0) {
+      if (indices.includes(0)) {
         selectedRelays = [...allRelays]
       } else {
-        selectedRelays = [allRelays[index - 1]]
+        selectedRelays = indices.map(i => allRelays[i - 1])
       }
 
       console.log(`  Connecting to ${selectedRelays.length} relay(s)...`)
       connectToRelays(selectedRelays)
-      await new Promise((r) => setTimeout(r, 2000))
 
-      const map = getRelayStatusMap()
-      const connected = selectedRelays.filter(u => map.get(u) === SocketStatus.Open)
-      for (const url of selectedRelays) {
-        console.log(`  ${map.get(url) === SocketStatus.Open ? '✅' : '❌'} ${url}`)
-      }
+      // Wait for connections (status updates come through callback in real-time)
+      const results = await Promise.all(selectedRelays.map(url => waitForRelayConnection(url, 10000)))
+      const connected = selectedRelays.filter((_, i) => results[i])
 
       if (connected.length === 0) {
         console.log('  ❌ Failed to connect to any selected relay.\n')
@@ -477,21 +462,18 @@ Tips:
         continue
       }
 
-      initTracking(selectedRelays)
+      initTracking(connected)
 
       // Fetch contacts
       console.log('  Fetching contacts...')
-      contacts = await fetchContacts(session.masterPubkey, selectedRelays)
+      contacts = await fetchContacts(session.masterPubkey, connected)
       console.log(`  ${contacts.length} contact(s) loaded.`)
 
       // Start receiving
-      receiver = startReceiving(session.masterPubkey, session.masterPrivkey, selectedRelays, onMessage)
+      receiver = startReceiving(session.masterPubkey, session.masterPrivkey, connected, onMessage)
 
-      if (selectedRelays.length === allRelays.length) {
-        console.log('  ✅ Using all relays.\n')
-      } else {
-        console.log(`  ✅ Using: ${selectedRelays[0]}\n`)
-      }
+      selectedRelays = connected
+      console.log(`  ✅ Connected. Using: ${connected.join(', ')}\n`)
       continue
     }
 

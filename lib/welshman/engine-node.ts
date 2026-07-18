@@ -1,8 +1,8 @@
 // engine-node.ts - Node.js compatible welshman initialization
 // Thin wrapper around engine.ts with nodeMode=true.
-// Both CLI and UI share the SAME pool/tracker singletons via engine.ts.
+// Both CLI and web share the SAME pool/tracker singletons via engine.ts.
 
-import { initEngine, destroyEngine, getPool, getTracker } from './engine'
+import { initEngine, destroyEngine } from './engine'
 
 let initialized = false
 
@@ -14,14 +14,6 @@ export function initNodeEngine(): void {
   if (initialized) return
   initEngine({ nodeMode: true })
   initialized = true
-}
-
-export function getNodePool() {
-  return getPool()
-}
-
-export function getNodeTracker() {
-  return getTracker()
 }
 
 export function destroyNodeEngine(): void {

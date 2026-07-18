@@ -1,7 +1,7 @@
 // contacts.ts — Relay-based contact management for CLI
 // Stores contacts list as NIP-02 kind:3 events on relay (shared with UI)
 
-import { fetchEvents, publishEvent } from './relay-node'
+import { fetchEvents, publishEvent } from '@/lib/welshman/relay-manager'
 import { decryptGiftWrap } from '@/lib/welshman/crypto'
 import { buildFollowListEvent } from '@/lib/welshman/crypto'
 import type { Filter, SignedEvent } from '@welshman/util'
