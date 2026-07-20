@@ -40,9 +40,10 @@ interface NostrContextValue {
   register(username: string, password: string): Promise<NostrResult<NostrSession>>
   logout(): void
   switchIdentity(pubkey: string): Promise<NostrResult>
-  createIdentity(name: string): Promise<NostrResult<VaultIdentity>>
+  createIdentity(name: string, slogan?: string): Promise<NostrResult<VaultIdentity>>
   deleteIdentity(pubkey: string): Promise<NostrResult>
-  updateIdentityName(pubkey: string, name: string): Promise<NostrResult>
+  deleteAllIdentities(): Promise<NostrResult>
+  updateIdentity(pubkey: string, updates: { name?: string; slogan?: string }): Promise<NostrResult>
   setAdapterMode(mode: AdapterMode): void
 }
 
@@ -115,6 +116,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
   })
   // Private key lives ONLY in memory ref, never in React state
   const masterPrivkeyRef = useRef<string | null>(null)
+  const masterPubkeyRef = useRef<string | null>(null)
   const identityPrivkeyRef = useRef<string | null>(null)
   const [adapter, setAdapter] = useState<INostrAdapter>(() => {
     if (initialAdapterMode === 'mock-telegram') {
@@ -157,6 +159,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     // Session was restored from localStorage but private keys are lost — defer state updates
     queueMicrotask(() => {
       masterPrivkeyRef.current = null
+      masterPubkeyRef.current = null
       identityPrivkeyRef.current = null
      setSession(EMPTY_SESSION)
      if (typeof window !== 'undefined') {
@@ -218,6 +221,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     try {
       const masterKey = deriveMasterKey(username, password)
       masterPrivkeyRef.current = masterKey.privateKey
+      masterPubkeyRef.current = masterKey.publicKey
 
       const relays = await ensureRelays()
       const vaultData = await vaultSync.fetchVault(
@@ -268,6 +272,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       return { success: true, data: newSession }
     } catch (error) {
       masterPrivkeyRef.current = null
+      masterPubkeyRef.current = null
       return { success: false, error: String(error) }
     }
   }, [])
@@ -297,6 +302,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     masterPrivkeyRef.current = null
+    masterPubkeyRef.current = null
     identityPrivkeyRef.current = null
     setSession(EMPTY_SESSION)
     if (typeof window !== 'undefined') {
@@ -330,7 +336,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         currentPubkey: pubkey,
       }
       setSession(newSession)
-      persistSession({ ...newSession })
+      persistSession({ ...newSession, masterPubkey: masterPubkeyRef.current ?? undefined })
 
       const newAdapter = buildAdapterForSession(newSession, identityPrivkey, relays)
       setAdapter(newAdapter)
@@ -341,7 +347,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
-  const createIdentity = useCallback(async (name: string): Promise<NostrResult<VaultIdentity>> => {
+  const createIdentity = useCallback(async (name: string, slogan?: string): Promise<NostrResult<VaultIdentity>> => {
     const masterPrivkey = masterPrivkeyRef.current
     if (!masterPrivkey || !session.vaultData) {
       return { success: false, error: 'Session not unlocked' }
@@ -353,20 +359,35 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
       const identity: VaultIdentity = {
         name,
+        ...(slogan?.trim() ? { slogan: slogan.trim() } : {}),
         pubkey: newKey.publicKey,
         encryptedSecret,
         createdAt: Date.now(),
       }
 
      const updatedVault = addIdentityToVault(session.vaultData, identity)
-      await ensureRelays()
+      const relays = await ensureRelays()
      await vaultSync.updateVault(masterPrivkey, updatedVault)
 
-      const newSession: NostrSession = {
+      // If no identity was active before (e.g. first identity), activate the new one
+      const hadActiveIdentity = session.vaultData.identities.some(
+        i => i.pubkey === session.currentPubkey
+      )
+
+      let newSession: NostrSession = {
         ...session,
         vaultData: updatedVault,
       }
-      setSession(newSession)
+
+      if (!hadActiveIdentity) {
+        identityPrivkeyRef.current = newKey.privateKey
+        newSession = { ...newSession, currentPubkey: identity.pubkey }
+        setSession(newSession)
+        persistSession({ ...newSession, masterPubkey: masterPubkeyRef.current ?? undefined })
+        setAdapter(buildAdapterForSession(newSession, newKey.privateKey, relays))
+      } else {
+        setSession(newSession)
+      }
 
       return { success: true, data: identity }
     } catch (error) {
@@ -396,9 +417,43 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
-  const updateIdentityName = useCallback(async (
+  const deleteAllIdentities = useCallback(async (): Promise<NostrResult> => {
+    const masterPrivkey = masterPrivkeyRef.current
+    const masterPubkey = masterPubkeyRef.current
+    if (!masterPrivkey || !masterPubkey || !session.vaultData) {
+      return { success: false, error: 'Session not unlocked' }
+    }
+
+    try {
+      const updatedVault: VaultData = {
+        ...session.vaultData,
+        identities: [],
+        updatedAt: Date.now(),
+      }
+      const relays = await ensureRelays()
+      await vaultSync.updateVault(masterPrivkey, updatedVault)
+
+      // Reset to "no active identity" — master key becomes the fallback, which
+      // makes the (main) layout re-trigger the identity onboarding gate.
+      identityPrivkeyRef.current = masterPrivkey
+      const newSession: NostrSession = {
+        ...session,
+        currentPubkey: masterPubkey,
+        vaultData: updatedVault,
+      }
+      setSession(newSession)
+      persistSession({ ...newSession, masterPubkey })
+      setAdapter(buildAdapterForSession(newSession, masterPrivkey, relays))
+
+      return { success: true, data: undefined }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
+  }, [session])
+
+  const updateIdentity = useCallback(async (
     pubkey: string,
-    name: string
+    updates: { name?: string; slogan?: string }
   ): Promise<NostrResult> => {
     const masterPrivkey = masterPrivkeyRef.current
     if (!masterPrivkey || !session.vaultData) {
@@ -406,9 +461,17 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const updatedIdentities = session.vaultData.identities.map(i =>
-        i.pubkey === pubkey ? { ...i, name } : i
-      )
+      const updatedIdentities = session.vaultData.identities.map(i => {
+        if (i.pubkey !== pubkey) return i
+        const next: VaultIdentity = { ...i }
+        if (updates.name !== undefined) next.name = updates.name
+        if (updates.slogan !== undefined) {
+          const trimmed = updates.slogan.trim()
+          if (trimmed) next.slogan = trimmed
+          else delete next.slogan
+        }
+        return next
+      })
      const updatedVault: VaultData = {
        ...session.vaultData,
        identities: updatedIdentities,
@@ -444,6 +507,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     } else {
       // Switch back to real mode — require re-login
       masterPrivkeyRef.current = null
+      masterPubkeyRef.current = null
       identityPrivkeyRef.current = null
       setSession(EMPTY_SESSION)
       if (typeof window !== 'undefined') {
@@ -467,7 +531,8 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         switchIdentity,
         createIdentity,
         deleteIdentity,
-        updateIdentityName,
+        deleteAllIdentities,
+        updateIdentity,
         setAdapterMode: switchAdapterMode,
       }}
     >

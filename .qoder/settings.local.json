@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/david/_projects/2_personal/projects/dodo-box && echo \"=== app structure ===\" && find app -type f -name \"*.tsx\" -o -type f -name \"*.ts\" | head -50 && echo \"=== hooks ===\" && ls hooks/ && echo \"=== lib ===\" && ls lib/)"
+    ]
+  }
+}

@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import IdentityOnboarding from '@/components/settings/IdentityOnboarding';
 import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { session } = useNostr();
+  const { session, adapterMode } = useNostr();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -23,6 +24,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, [router, session.isAuthenticated]);
 
   if (!isReady) return null;
+
+  const hasActiveIdentity = (session.vaultData?.identities ?? []).some(
+    (i) => i.pubkey === session.currentPubkey
+  );
+  const needsIdentity =
+    adapterMode !== 'mock-telegram' &&
+    session.vaultData !== null &&
+    !hasActiveIdentity;
+
+  if (needsIdentity) {
+    return <IdentityOnboarding />;
+  }
 
   const isChatDetail = pathname.startsWith('/messages/') && pathname !== '/messages';
 

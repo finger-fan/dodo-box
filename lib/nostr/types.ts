@@ -11,6 +11,7 @@ export const KIND_VAULT = 31990
 
 export interface VaultIdentity {
   name: string
+  slogan?: string
   pubkey: string
   encryptedSecret: string
   createdAt: number

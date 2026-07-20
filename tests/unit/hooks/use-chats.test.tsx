@@ -100,7 +100,8 @@ function makeWrapper(adapter: INostrAdapter, session: NostrSession = TEST_SESSIO
           switchIdentity: vi.fn(),
           createIdentity: vi.fn(),
           deleteIdentity: vi.fn(),
-          updateIdentityName: vi.fn(),
+          deleteAllIdentities: vi.fn(),
+          updateIdentity: vi.fn(),
           adapterMode: 'mock-telegram',
           setAdapterMode: vi.fn(),
         }}
