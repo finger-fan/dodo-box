@@ -25,6 +25,7 @@
     "system": "System",
     "dark_mode": "Dark Mode",
     "network_data": "Network & Data",
+    "privacy": "Privacy",
     "relays": "Relays",
     "message_ttl": "Message TTL",
     "export": "Export",
@@ -76,7 +77,9 @@
     "mask_charset_hangul": "Hangul",
     "mask_charset_braille": "Braille",
     "mask_charset_symbols": "Symbols",
-    "mask_tap_reveal": "Tap to reveal"
+    "mask_tap_reveal": "Tap to reveal",
+    "allow_screenshot": "Allow Screenshot",
+    "allow_screenshot_desc": "Enable to allow screenshots and screen recording. Disable for better privacy protection."
   },
   "contacts": {
     "add_contact": "Add Contact",

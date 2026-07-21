@@ -18,6 +18,7 @@ import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
+import { isScreenshotAllowed, setScreenshotAllowed } from '@/lib/privacy-screen';
 import {
   MASK_CHARSETS,
   MASK_SECONDS_OPTIONS,
@@ -63,6 +64,7 @@ export default function SettingsPage() {
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
+  const [screenshotAllowed, setScreenshotAllowedState] = useState(() => isScreenshotAllowed());
 
   const [maskSeconds, setMaskSecondsState] = useState(() => getMaskSeconds());
   const [maskCharsetId, setMaskCharsetIdState] = useState(() => getMaskCharsetId());
@@ -323,10 +325,35 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Network & Data */}
+        {/* Privacy */}
         <section className="space-y-3">
-          <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.network_data')}</div>
+          <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.privacy')}</div>
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <EyeOff className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.allow_screenshot')}</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.allow_screenshot_desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !screenshotAllowed;
+                  setScreenshotAllowed(next);
+                  setScreenshotAllowedState(next);
+                }}
+                className={cn(
+                  "relative w-10 h-6 rounded-full transition-colors",
+                  screenshotAllowed ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  screenshotAllowed ? "left-[18px]" : "left-0.5"
+                )} />
+              </button>
+            </div>
             <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

@@ -25,6 +25,7 @@
     "system": "系统",
     "dark_mode": "深色模式",
     "network_data": "网络与数据",
+    "privacy": "隐私",
     "relays": "中继器",
     "message_ttl": "消息有效期",
     "export": "导出",
@@ -76,7 +77,9 @@
     "mask_charset_hangul": "韩文",
     "mask_charset_braille": "盲文",
     "mask_charset_symbols": "符号",
-    "mask_tap_reveal": "点击显示"
+    "mask_tap_reveal": "点击显示",
+    "allow_screenshot": "允许截屏",
+    "allow_screenshot_desc": "开启后允许对应用截屏和录屏。关闭可获得更好的隐私保护。"
   },
   "contacts": {
     "add_contact": "添加联系人",
