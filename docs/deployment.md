@@ -77,7 +77,7 @@ pnpm check            # tsc --noEmit + eslint
 
 ### VPS 独立部署 relay
 
-生产环境在 VPS 上单独运行 relay（Nginx 反代 + WSS）使用 `docker/docker-compose.relay.yml`，完整步骤见 [relay-vps-deployment.md](./relay-vps-deployment.md)。
+生产环境在 VPS 上单独运行 relay（Nginx 反代 + WSS）的历史步骤见归档文档 [relay-vps-deployment.md](./archive/plans-and-investigations/relay-vps-deployment.md)（注意：其配套的 `docker-compose.relay.yml` 已合并进统一的 `docker-compose.dodo.yml`）。
 
 ## 5. 验证部署
 

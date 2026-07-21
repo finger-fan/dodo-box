@@ -1,13 +1,13 @@
-# docker-compose.relay.yml — VPS 生产部署用的 Nostr relay（strfry）
+# docker-compose.dodo.yml — VPS 生产部署用的 Nostr relay（strfry）
 #
 # 用法（在仓库根目录执行）：
-#   docker compose -f docker/docker-compose.relay.yml up -d
+#   docker compose -f docker/docker-compose.dodo.yml up -d
 #
 # 端口绑定说明：
 #   默认绑定 127.0.0.1，relay 不直接暴露公网——由同一台 VPS 上的 Nginx
-#   终结 TLS 后以 wss:// 对外提供（推荐，见 docs/relay-vps-deployment.md）。
+#   终结 TLS 后以 wss:// 对外提供（推荐，见 docs/archive/plans-and-investigations/relay-vps-deployment.md）。
 #   仅当 Nginx 在另一台机器或另一个 Docker 网络里时，才需要：
-#     RELAY_BIND=0.0.0.0 docker compose -f docker/docker-compose.relay.yml up -d
+#     RELAY_BIND=0.0.0.0 docker compose -f docker/docker-compose.dodo.yml up -d
 #   此时务必用防火墙/云安全组把 7777 限制为仅 Nginx 来源可访问。
 
 name: dodo-box
