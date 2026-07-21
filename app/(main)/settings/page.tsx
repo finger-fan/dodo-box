@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   UserCircle, LogOut, Shield,
   Trash2, Download, ChevronRight, Clock,
   RefreshCw, RotateCcw, Loader2,
-  Server,
+  Server, EyeOff, Type,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Toast from '@/components/ui/Toast';
@@ -18,6 +18,14 @@ import { useMounted } from '@/hooks/use-mounted';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
+import {
+  MASK_CHARSETS,
+  MASK_SECONDS_OPTIONS,
+  getMaskCharsetId,
+  getMaskSeconds,
+  setMaskCharsetId,
+  setMaskSeconds,
+} from '@/lib/message-mask';
 import type { AdapterMode } from '@/lib/nostr';
 
 const TTL_OPTIONS = [
@@ -29,6 +37,13 @@ const TTL_OPTIONS = [
   { value: 2592000, labelKey: 'settings.ttl_30days' },
   { value: 0, labelKey: 'settings.ttl_permanent' },
 ];
+
+const MASK_SECONDS_LABELS: Record<number, string> = {
+  5: 'settings.mask_5s',
+  10: 'settings.mask_10s',
+  30: 'settings.mask_30s',
+  0: 'settings.mask_off',
+};
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -48,6 +63,43 @@ export default function SettingsPage() {
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
+
+  const [maskSeconds, setMaskSecondsState] = useState(() => getMaskSeconds());
+  const [maskCharsetId, setMaskCharsetIdState] = useState(() => getMaskCharsetId());
+  const [isMaskSecondsOpen, setIsMaskSecondsOpen] = useState(false);
+  const [isMaskCharsetOpen, setIsMaskCharsetOpen] = useState(false);
+  const ttlRef = useRef<HTMLDivElement>(null);
+  const maskSecondsRef = useRef<HTMLDivElement>(null);
+  const maskCharsetRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      console.log('[handleClickOutside] triggered', {
+        target: e.target,
+        ttlRef: !!ttlRef.current,
+        maskSecondsRef: !!maskSecondsRef.current,
+        maskCharsetRef: !!maskCharsetRef.current,
+        isTtlOpen,
+        isMaskSecondsOpen,
+        isMaskCharsetOpen,
+      });
+      if (ttlRef.current && !ttlRef.current.contains(e.target as Node)) {
+        console.log('[handleClickOutside] closing TTL');
+        setIsTtlOpen(false);
+      }
+      if (maskSecondsRef.current && !maskSecondsRef.current.contains(e.target as Node)) {
+        console.log('[handleClickOutside] closing maskSeconds');
+        setIsMaskSecondsOpen(false);
+      }
+      if (maskCharsetRef.current && !maskCharsetRef.current.contains(e.target as Node)) {
+        console.log('[handleClickOutside] closing maskCharset');
+        setIsMaskCharsetOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isTtlOpen, isMaskSecondsOpen, isMaskCharsetOpen]);
 
   const updater = useUpdater();
   const isNative = mounted && Capacitor.isNativePlatform();
@@ -71,6 +123,21 @@ export default function SettingsPage() {
   };
 
   const currentTtlLabel = TTL_OPTIONS.find(o => o.value === messageTtl)?.labelKey || 'settings.ttl_30days';
+
+  const handleMaskSecondsChange = (value: number) => {
+    setMaskSecondsState(value);
+    setMaskSeconds(value);
+    setIsMaskSecondsOpen(false);
+  };
+
+  const handleMaskCharsetChange = (id: string) => {
+    setMaskCharsetIdState(id);
+    setMaskCharsetId(id);
+    setIsMaskCharsetOpen(false);
+  };
+
+  const currentMaskSecondsLabel = MASK_SECONDS_LABELS[maskSeconds] ?? 'settings.mask_off';
+  const currentMaskCharsetLabel = MASK_CHARSETS.find(c => c.id === maskCharsetId)?.labelKey || MASK_CHARSETS[0].labelKey;
 
   const handleToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -183,12 +250,83 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Privacy Mask */}
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-3xl">
+            <div className="p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <EyeOff className="w-5 h-5 text-zinc-400" />
+                  <div>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.mask_reveal_time')}</span>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.mask_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setIsMaskSecondsOpen(!isMaskSecondsOpen); setIsMaskCharsetOpen(false); }}
+                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                >
+                  {t(currentMaskSecondsLabel)}
+                </button>
+              </div>
+              {isMaskSecondsOpen && (
+                <div ref={maskSecondsRef} className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                  {MASK_SECONDS_OPTIONS.map((value) => (
+                    <button
+                      key={value}
+                      onClick={() => handleMaskSecondsChange(value)}
+                      className={cn(
+                        "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                        maskSeconds === value
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold"
+                          : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                      )}
+                    >
+                      {t(MASK_SECONDS_LABELS[value] ?? 'settings.mask_off')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Type className="w-5 h-5 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.mask_charset')}</span>
+                </div>
+                <button
+                  onClick={() => { setIsMaskCharsetOpen(!isMaskCharsetOpen); setIsMaskSecondsOpen(false); }}
+                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                >
+                  {t(currentMaskCharsetLabel)}
+                </button>
+              </div>
+              {isMaskCharsetOpen && (
+                <div ref={maskCharsetRef} className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                  {MASK_CHARSETS.map((cs) => (
+                    <button
+                      key={cs.id}
+                      onClick={() => handleMaskCharsetChange(cs.id)}
+                      className={cn(
+                        "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                        maskCharsetId === cs.id
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold"
+                          : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                      )}
+                    >
+                      {t(cs.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* Network & Data */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.network_data')}</div>
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
             <div className="ttl-input-group p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -203,7 +341,7 @@ export default function SettingsPage() {
                 </button>
               </div>
               {isTtlOpen && (
-                <div className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                <div ref={ttlRef} className="absolute right-4 top-full mt-1 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
                   {TTL_OPTIONS.map((option) => (
                     <button
                       key={option.value}

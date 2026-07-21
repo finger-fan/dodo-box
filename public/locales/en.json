@@ -64,7 +64,19 @@
     "contact_cache": "Contact Cache",
     "contact_cache_desc": "Cache contact names locally to reduce loading delay. Disable for maximum privacy.",
     "relays_configured": "Configured",
-    "relays_updated": "Relays updated"
+    "relays_updated": "Relays updated",
+    "mask_desc": "Messages auto-hide after a delay and are replaced with mask characters; tap to reveal.",
+    "mask_reveal_time": "Auto-hide delay",
+    "mask_5s": "5s",
+    "mask_10s": "10s",
+    "mask_30s": "30s",
+    "mask_off": "Never",
+    "mask_charset": "Mask style",
+    "mask_charset_blocks": "Blocks",
+    "mask_charset_hangul": "Hangul",
+    "mask_charset_braille": "Braille",
+    "mask_charset_symbols": "Symbols",
+    "mask_tap_reveal": "Tap to reveal"
   },
   "contacts": {
     "add_contact": "Add Contact",

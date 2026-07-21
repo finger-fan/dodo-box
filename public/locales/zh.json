@@ -64,7 +64,19 @@
     "contact_cache": "联系人缓存",
     "contact_cache_desc": "本地缓存联系人名称以减少加载延迟。关闭可获得最大隐私保护。",
     "relays_configured": "已配置",
-    "relays_updated": "中继已更新"
+    "relays_updated": "中继已更新",
+    "mask_desc": "消息显示一段时间后自动替换为遮罩字符，点击可恢复。",
+    "mask_reveal_time": "屏显时间",
+    "mask_5s": "5 秒",
+    "mask_10s": "10 秒",
+    "mask_30s": "30 秒",
+    "mask_off": "无限制",
+    "mask_charset": "遮罩字符",
+    "mask_charset_blocks": "方块",
+    "mask_charset_hangul": "韩文",
+    "mask_charset_braille": "盲文",
+    "mask_charset_symbols": "符号",
+    "mask_tap_reveal": "点击显示"
   },
   "contacts": {
     "add_contact": "添加联系人",

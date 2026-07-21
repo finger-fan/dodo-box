@@ -11,6 +11,8 @@ import { useMessages } from '@/hooks/nostr/use-messages';
 import { isGapIndicator } from '@/lib/nostr/gap-detection';
 import type { DeliveryStatus } from '@/lib/nostr/types';
 import { useNostr } from '@/contexts/NostrContext';
+import { useMaskSettings } from '@/hooks/use-mask-settings';
+import MaskedText from '@/components/chat/MaskedText';
 
 function PendingDot() {
   return (
@@ -48,6 +50,7 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const { adapter } = useNostr();
   const { chatItems, sendMessage, isSending, recoverGap, retrySend } = useMessages(id);
+  const { seconds: maskSeconds, chars: maskChars } = useMaskSettings();
   const [msgInput, setMsgInput] = useState('');
   const mounted = useMounted();
   const [chatName, setChatName] = useState('');
@@ -124,7 +127,7 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
       </header>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {chatItems.length === 0 ? (
           <div className="empty-chat flex flex-col items-center justify-center h-full opacity-20">
             <div className="empty-hint text-sm font-medium dark:text-zinc-400">{t('chat.no_messages')}</div>
@@ -165,7 +168,7 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
                       ? "mine bg-emerald-600 text-white rounded-tr-none"
                       : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-tl-none border border-zinc-100 dark:border-zinc-800"
                   )}>
-                    {msg.text}
+                    <MaskedText key={`mask-${maskSeconds}-${maskChars}`} text={msg.text} seconds={maskSeconds} chars={maskChars} />
                   </div>
                   <span className="text-[10px] text-zinc-400 mt-1 px-1 inline-flex items-center">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
