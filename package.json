@@ -1,6 +1,6 @@
 {
   "name": "dodo-box",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -31,9 +31,9 @@
     "cap:export": "node scripts/cap-build-export.js",
     "cap:sync": "npx cap sync android",
     "cap:build": "pnpm cap:export && pnpm cap:sync",
-    "cap:apk:debug": "pnpm cap:build && cd android && ./gradlew assembleDebug",
-    "cap:apk:release": "pnpm cap:build && cd android && ./gradlew assembleRelease",
-    "cap:bundle": "node scripts/cap-bundle.js",
+    "cap:apk:debug": "rm -rf .next && node scripts/sync-version.js && pnpm cap:build && cd android && ./gradlew assembleDebug",
+    "cap:apk:release": "rm -rf .next && node scripts/sync-version.js && pnpm cap:build && cd android && ./gradlew assembleRelease && node scripts/copy-apk-to-download.js",
+    "cap:bundle": "node scripts/sync-version.js && node scripts/cap-bundle.js",
     "cap:upload": "bash scripts/cap-upload.sh",
     "cap:open": "npx cap open android",
     "cap:deploy": "bash scripts/cap-deploy.sh",
