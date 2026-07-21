@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Globe, Moon, Shield, Pencil } from 'lucide-react';
+import { Globe, Moon, Shield, Pencil, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
-import { getStatusMap, initRelayManager } from '@/lib/welshman/relay-manager';
-import type { RelayStatus } from '@/lib/welshman/relay-manager';
+import {
+  getStatusMap,
+  getRelayStateMap,
+  initRelayManager,
+  connectToRelays,
+  reconnectRelay,
+  reconnectFailedRelays,
+  hasFailedRelays,
+} from '@/lib/welshman/relay-manager';
+import type { RelayStatus, RelayState } from '@/lib/welshman/relay-manager';
 import { getDefaultRelays, getUserRelays, setUserRelays } from '@/lib/runtime-config';
 
 interface GeneralSettingsProps {
@@ -37,14 +45,20 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
     if (typeof window === 'undefined') return new Map();
     return getStatusMap();
   });
+  const [stateMap, setStateMap] = useState<Map<string, RelayState>>(() => {
+    if (typeof window === 'undefined') return new Map();
+    return getRelayStateMap();
+  });
 
-  // Subscribe to real-time relay status changes instead of polling
-  const handleStatusChange = useCallback((url: string, status: RelayStatus) => {
-    setStatusMap(prev => {
-      const next = new Map(prev);
-      next.set(url, status);
-      return next;
-    });
+  // Initialize relay connections on mount
+  useEffect(() => {
+    connectToRelays(relays);
+  }, []);
+
+  // Subscribe to real-time relay status changes
+  const handleStatusChange = useCallback((_url: string, _status: RelayStatus, _state: RelayState) => {
+    setStatusMap(getStatusMap());
+    setStateMap(getRelayStateMap());
   }, []);
 
   useEffect(() => {
@@ -81,8 +95,24 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
   function getStatusColor(status?: RelayStatus) {
     if (status === 'connected') return 'bg-emerald-500';
     if (status === 'connecting') return 'bg-amber-500';
-    return 'bg-red-500';
+    if (status === 'failed' || status === 'unavailable') return 'bg-red-500';
+    return 'bg-zinc-400';
   }
+
+  function getStatusText(relay: string): string {
+    const status = statusMap.get(relay);
+    const state = stateMap.get(relay);
+    
+    if (status === 'connecting' && state && state.retryCount > 0) {
+      return t('relay.status.reconnecting', { count: state.retryCount, max: 3 });
+    }
+    if (status === 'unavailable') {
+      return t('relay.status.unavailable');
+    }
+    return t(`relay.status.${status || 'closed'}`, { defaultValue: status || 'closed' });
+  }
+
+  const hasFailed = hasFailedRelays();
 
   if (!mounted) return null;
 
@@ -164,15 +194,39 @@ export default function GeneralSettings({ onToast }: GeneralSettingsProps) {
           </div>
         ) : (
           <div className="space-y-2">
-            {relays.map((relay) => (
-              <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
-                <span>{relay}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] capitalize">{statusMap.get(relay) || 'closed'}</span>
-                  <div className={cn('w-1.5 h-1.5 rounded-full', getStatusColor(statusMap.get(relay)))} />
+            {relays.map((relay) => {
+              const status = statusMap.get(relay);
+              const isFailed = status === 'failed' || status === 'unavailable';
+              
+              return (
+                <div key={relay} className="relay-item text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg flex items-center justify-between">
+                  <span className="truncate flex-1">{relay}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px]">{getStatusText(relay)}</span>
+                    <div className={cn('w-1.5 h-1.5 rounded-full', getStatusColor(status))} />
+                    {isFailed && (
+                      <button
+                        onClick={() => reconnectRelay(relay)}
+                        className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                        aria-label={t('relay.reconnect')}
+                        title={t('relay.reconnect')}
+                      >
+                        <RotateCcw className="w-3 h-3 text-zinc-400" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+            {hasFailed && (
+              <button
+                onClick={reconnectFailedRelays}
+                className="w-full py-2 mt-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {t('relay.reconnect_failed')}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -9,28 +9,41 @@ import { SocketStatus } from '@welshman/net'
 import { SocketEvent } from '@welshman/net'
 
 const DEFAULT_REQUEST_TIMEOUT = 8000
+const MAX_RETRY_COUNT = 3
 
-// ── Status Callback ──────────────────────────────────────────────
+// ── Status Types ──────────────────────────────────────────────
 
-export type RelayStatus = 'connecting' | 'connected' | 'failed' | 'closed'
+export type RelayStatus = 'connecting' | 'connected' | 'failed' | 'unavailable' | 'closed'
 
-export type OnRelayStatusChange = (url: string, status: RelayStatus) => void
+export interface RelayState {
+  status: RelayStatus
+  retryCount: number
+  firstFailedAt?: number
+}
+
+export type OnRelayStatusChange = (url: string, status: RelayStatus, state: RelayState) => void
 
 export interface RelayManagerOptions {
   onStatusChange?: OnRelayStatusChange
 }
 
 let onStatusChange: OnRelayStatusChange | undefined
-const relayStatusMap = new Map<string, RelayStatus>()
+const relayStateMap = new Map<string, RelayState>()
 const trackedSocketUrls = new Set<string>()
 
-function mapSocketStatus(s: SocketStatus): RelayStatus {
-  switch (s) {
-    case SocketStatus.Opening: return 'connecting'
-    case SocketStatus.Open:    return 'connected'
-    case SocketStatus.Error:   return 'failed'
-    default:                   return 'closed'
+function createRelayState(status: RelayStatus, retryCount = 0): RelayState {
+  return {
+    status,
+    retryCount,
+    firstFailedAt: status === 'failed' ? Date.now() : undefined,
   }
+}
+
+function computeStatus(state: RelayState): RelayStatus {
+  if (state.retryCount >= MAX_RETRY_COUNT && state.status === 'failed') {
+    return 'unavailable'
+  }
+  return state.status
 }
 
 /**
@@ -44,19 +57,28 @@ export function initRelayManager(options?: RelayManagerOptions): void {
 }
 
 /**
- * Get a snapshot of current relay statuses (our mapped type).
+ * Get a snapshot of current relay states.
+ */
+export function getRelayStateMap(): Map<string, RelayState> {
+  return new Map(relayStateMap)
+}
+
+/**
+ * Get a snapshot of current relay statuses (computed from state).
  */
 export function getStatusMap(): Map<string, RelayStatus> {
-  // Merge pool state for any sockets we haven't tracked yet
-  const pool = getPool()
-  if (pool) {
-    for (const [url, socket] of pool._data.entries()) {
-      if (!relayStatusMap.has(url)) {
-        relayStatusMap.set(url, mapSocketStatus(socket.status))
-      }
-    }
+  const result = new Map<string, RelayStatus>()
+  for (const [url, state] of relayStateMap.entries()) {
+    result.set(url, computeStatus(state))
   }
-  return new Map(relayStatusMap)
+  return result
+}
+
+/**
+ * Get relay state for a specific URL.
+ */
+export function getRelayState(url: string): RelayState | undefined {
+  return relayStateMap.get(url)
 }
 
 // ── Core Operations ──────────────────────────────────────────────
@@ -74,18 +96,49 @@ export function connectToRelays(relayUrls: readonly string[]): void {
     // Register status listener once per URL
     if (!trackedSocketUrls.has(url)) {
       trackedSocketUrls.add(url)
-      relayStatusMap.set(url, mapSocketStatus(socket.status))
+      
+      // Initialize state based on current socket status
+      const initialStatus = mapSocketStatusToRelayStatus(socket.status)
+      relayStateMap.set(url, createRelayState(initialStatus))
 
       socket.on(SocketEvent.Status, (status: SocketStatus) => {
-        const rs = mapSocketStatus(status)
-        relayStatusMap.set(url, rs)
-        onStatusChange?.(url, rs)
+        const prev = relayStateMap.get(url)
+        const newStatus = mapSocketStatusToRelayStatus(status)
+        
+        // Track retry count: Error → Opening means retry attempt
+        let newRetryCount = prev?.retryCount ?? 0
+        if (prev?.status === 'failed' && newStatus === 'connecting') {
+          newRetryCount++
+        }
+        
+        // Reset retry count on successful connection
+        if (newStatus === 'connected') {
+          newRetryCount = 0
+        }
+        
+        const newState: RelayState = {
+          status: newStatus,
+          retryCount: newRetryCount,
+          firstFailedAt: newStatus === 'failed' ? Date.now() : undefined,
+        }
+        
+        relayStateMap.set(url, newState)
+        onStatusChange?.(url, computeStatus(newState), newState)
       })
     }
 
     if (socket.status === SocketStatus.Closed || socket.status === SocketStatus.Error) {
       socket.open()
     }
+  }
+}
+
+function mapSocketStatusToRelayStatus(s: SocketStatus): RelayStatus {
+  switch (s) {
+    case SocketStatus.Opening: return 'connecting'
+    case SocketStatus.Open:    return 'connected'
+    case SocketStatus.Error:   return 'failed'
+    default:                   return 'closed'
   }
 }
 
@@ -191,7 +244,46 @@ export function closeAllRelays(): void {
   if (!pool) return
   pool.clear()
   trackedSocketUrls.clear()
-  relayStatusMap.clear()
+  relayStateMap.clear()
+}
+
+/**
+ * Manually reconnect a single relay (resets retry count).
+ */
+export function reconnectRelay(url: string): void {
+  const pool = getPool()
+  if (!pool) return
+  const socket = pool.get(url)
+  
+  // Reset state and retry
+  relayStateMap.set(url, createRelayState('connecting', 0))
+  onStatusChange?.(url, 'connecting', relayStateMap.get(url)!)
+  socket.open()
+}
+
+/**
+ * Reconnect all failed or unavailable relays.
+ */
+export function reconnectFailedRelays(): void {
+  for (const [url, state] of relayStateMap.entries()) {
+    const computed = computeStatus(state)
+    if (computed === 'failed' || computed === 'unavailable') {
+      reconnectRelay(url)
+    }
+  }
+}
+
+/**
+ * Check if any relays are in failed or unavailable state.
+ */
+export function hasFailedRelays(): boolean {
+  for (const state of relayStateMap.values()) {
+    const computed = computeStatus(state)
+    if (computed === 'failed' || computed === 'unavailable') {
+      return true
+    }
+  }
+  return false
 }
 
 /**

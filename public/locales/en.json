@@ -155,5 +155,17 @@
     "error_no_relay": "No relay connection. Check your network and relay settings, then try again.",
     "error_account_not_found": "Account not found",
     "error_account_exists": "Account already exists"
+  },
+  "relay": {
+    "status": {
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "failed": "Failed",
+      "unavailable": "Unavailable",
+      "closed": "Closed",
+      "reconnecting": "Reconnecting ({{count}}/{{max}})"
+    },
+    "reconnect": "Reconnect",
+    "reconnect_failed": "Reconnect Failed"
   }
 }

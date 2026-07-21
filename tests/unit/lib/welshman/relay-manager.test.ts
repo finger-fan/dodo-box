@@ -163,7 +163,10 @@ describe('relay-manager status callbacks', () => {
     expect(onStatus).toBeDefined()
     onStatus(SocketStatus.Open)
 
-    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'connected')
+    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'connected', expect.objectContaining({
+      status: 'connected',
+      retryCount: 0,
+    }))
   })
 
   it('connectToRelays maps all statuses correctly', () => {
@@ -185,13 +188,20 @@ describe('relay-manager status callbacks', () => {
     expect(onStatus).toBeDefined()
 
     onStatus(SocketStatus.Opening)
-    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'connecting')
+    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'connecting', expect.objectContaining({
+      status: 'connecting',
+      retryCount: 0,
+    }))
 
     onStatus(SocketStatus.Error)
-    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'failed')
+    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'failed', expect.objectContaining({
+      status: 'failed',
+    }))
 
     onStatus(SocketStatus.Closed)
-    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'closed')
+    expect(cb).toHaveBeenCalledWith(RELAY_URL_2, 'closed', expect.objectContaining({
+      status: 'closed',
+    }))
   })
 
   it('getStatusMap reflects current tracked status', () => {
