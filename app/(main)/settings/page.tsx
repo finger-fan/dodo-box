@@ -161,7 +161,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 px-4 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 px-4 h-12 flex items-center justify-between">
         <h1 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100">{t('common.settings')}</h1>
       </header>
 
