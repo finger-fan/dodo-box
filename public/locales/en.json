@@ -11,6 +11,8 @@
     "delete": "Delete",
     "edit": "Edit",
     "copy": "Copy",
+    "copy_success": "Copied to clipboard",
+    "copy_failed": "Copy failed",
     "share": "Share",
     "new": "New",
     "logout": "Logout Session"

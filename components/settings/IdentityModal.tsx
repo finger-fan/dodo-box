@@ -10,6 +10,7 @@ import SwipeableListItem from '@/components/ui/SwipeableListItem';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import IdentityForm from '@/components/settings/IdentityForm';
 import { cn, encodeIdentityInfo } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import { useNostr } from '@/contexts/NostrContext';
 import type { VaultIdentity } from '@/lib/nostr/types';
 
@@ -76,10 +77,14 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
     }
   };
 
-  const handleCopyIdentity = (pubkey: string, nickname: string) => {
+  const handleCopyIdentity = async (pubkey: string, nickname: string) => {
     const identityStr = encodeIdentityInfo(pubkey, nickname);
-    navigator.clipboard.writeText(identityStr);
-    onToast(t('common.copy_success', 'Identity copied for sharing'), 'success');
+    const success = await copyToClipboard(identityStr);
+    if (success) {
+      onToast(t('common.copy_success', 'Identity copied for sharing'), 'success');
+    } else {
+      onToast(t('common.copy_failed', 'Copy failed'), 'error');
+    }
   };
 
   return (

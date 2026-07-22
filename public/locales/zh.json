@@ -11,6 +11,8 @@
     "delete": "删除",
     "edit": "编辑",
     "copy": "复制",
+    "copy_success": "已复制到剪贴板",
+    "copy_failed": "复制失败",
     "share": "分享",
     "new": "新建",
     "logout": "退出登录"
