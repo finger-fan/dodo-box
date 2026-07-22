@@ -111,7 +111,7 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
   return (
     <div className="chat-root flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Chat Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 px-4 h-16 flex items-center gap-3">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 px-4 h-12 flex items-center gap-3">
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
           <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
         </button>

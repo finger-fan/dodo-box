@@ -94,7 +94,7 @@ export default function IdentityModal({ isOpen, onClose, onToast }: IdentityModa
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col"
           >
-            <header className="px-4 h-16 flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800">
+            <header className="px-4 h-12 flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800">
               <button onClick={onClose} className="p-2 -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
                 <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
               </button>
