@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useMounted } from '@/hooks/use-mounted';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Shield, UserPlus, LogIn, ArrowRight, User, Lock, Settings as SettingsIcon, X } from 'lucide-react';
+import { Shield, LogIn, ArrowRight, User, Lock, Settings as SettingsIcon, X } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 import GeneralSettings from '@/components/settings/GeneralSettings';
 import { useNostr } from '@/contexts/NostrContext';
@@ -13,9 +13,9 @@ import { version } from '@/package.json';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, session } = useNostr();
+  const { login, session } = useNostr();
   const { t } = useTranslation();
-  const [view, setView] = useState<'initial' | 'login' | 'register'>('initial');
+  const [view, setView] = useState<'initial' | 'login'>('initial');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -38,12 +38,11 @@ export default function LoginPage() {
     }
   }, [t]);
 
-  const translateAuthError = (error: string | undefined, kind: 'login' | 'register'): string => {
-    const fallback = kind === 'login' ? t('auth.login_failed') : t('auth.registration_failed');
+  const translateAuthError = (error: string | undefined): string => {
+    const fallback = t('auth.login_failed');
     if (!error) return fallback;
     if (error.startsWith('No relay connection')) return t('auth.error_no_relay');
     if (error === 'Account not found') return t('auth.error_account_not_found');
-    if (error === 'Account already exists') return t('auth.error_account_exists');
     return error;
   };
 
@@ -55,20 +54,7 @@ export default function LoginPage() {
     if (result.success) {
       router.push('/messages');
     } else {
-      setToast({ message: translateAuthError(result.error, 'login'), type: 'error' });
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!username || !password) return;
-    setIsLoading(true);
-    const result = await register(username, password);
-    setIsLoading(false);
-    if (result.success) {
-      setToast({ message: t('auth.registered_success'), type: 'success' });
-      setView('login');
-    } else {
-      setToast({ message: translateAuthError(result.error, 'register'), type: 'error' });
+      setToast({ message: translateAuthError(result.error), type: 'error' });
     }
   };
 
@@ -114,32 +100,17 @@ export default function LoginPage() {
                 </div>
                 <ArrowRight className="w-5 h-5 ml-auto text-zinc-300 group-hover:text-emerald-500 transition-colors" />
               </button>
-
-              <button
-                data-testid="method-register"
-                onClick={() => setView('register')}
-                className="w-full group flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 transition-all shadow-sm"
-              >
-                <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                  <UserPlus className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">{t('auth.register_method')}</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">{t('auth.register_method_desc')}</div>
-                </div>
-                <ArrowRight className="w-5 h-5 ml-auto text-zinc-300 group-hover:text-emerald-500 transition-colors" />
-              </button>
             </motion.div>
           )}
 
-          {(view === 'login' || view === 'register') && (
+          {view === 'login' && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="space-y-4 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
             >
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
-                {view === 'login' ? t('auth.login_title') : t('auth.register_title')}
+                {t('auth.login_title')}
               </h2>
               <div className="space-y-3">
                 <div className="space-y-1">
@@ -166,7 +137,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={t('auth.enter_password')}
-                      onKeyDown={(e) => e.key === 'Enter' && (view === 'login' ? handleLogin() : handleRegister())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                       className="w-full pl-10 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
@@ -181,20 +152,22 @@ export default function LoginPage() {
                 </button>
                 <button
                   data-testid="submit-btn"
-                  onClick={view === 'login' ? handleLogin : handleRegister}
+                  onClick={handleLogin}
                   disabled={!username || !password || isLoading}
                   className="flex-[2] px-4 py-3 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-200 flex items-center justify-center"
                 >
                   {isLoading ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    view === 'login' ? t('auth.login') : t('auth.register')
+                    t('auth.login')
                   )}
                 </button>
               </div>
             </motion.div>
           )}
         </div>
+        <div className="h-24" />
+
       </div>
 
       {isSettingsOpen && (

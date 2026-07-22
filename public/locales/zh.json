@@ -139,6 +139,7 @@
   "auth": {
     "refresh_logout": "为了安全，刷新页面后您已退出登录",
     "tagline": "账户管理",
+    "manager_title": "账户管理",
     "login_method": "登录账户",
     "login_method_desc": "通过用户名和密码派生密钥",
     "register_method": "注册账户",

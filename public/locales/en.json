@@ -139,6 +139,7 @@
   "auth": {
     "refresh_logout": "For your security, you've been logged out after refreshing",
     "tagline": "Decentralized Account Management",
+    "manager_title": "Account Management",
     "login_method": "Login to Account",
     "login_method_desc": "Derive from username & password",
     "register_method": "Register Account",
