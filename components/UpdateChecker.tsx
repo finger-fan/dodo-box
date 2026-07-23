@@ -54,6 +54,8 @@ function UpdateCheckerInner() {
 }
 
 export default function UpdateChecker() {
-  if (!Capacitor.isNativePlatform()) return null;
-  return <UpdateCheckerInner />;
+  // 临时禁用，排查 Android 上 "then() is not implemented" 错误导致的崩溃
+  return null;
+  // if (!Capacitor.isNativePlatform()) return null;
+  // return <UpdateCheckerInner />;
 }

@@ -59,3 +59,24 @@ JSON 对象 → 加密 → 二进制 → Base64 字符串
 
 ### 相关 Issue
 待创建
+
+
+
+07-23 13:01:09.039 19557 19637 D DodoBox : 🔎 [NostrContext] No persisted session found, starting with empty session
+07-23 13:01:09.039 19557 19637 E DodoBox : 🔴 [Providers] Unhandled rejection: [object Event]: [object Event]
+07-23 13:01:09.039 19557 19637 I DodoBox : 🟢 [Providers] App initialized
+07-23 13:01:09.053 19557 19637 W DodoBox : 🟠 [NostrContext] Failed to load runtime config, using defaults: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+07-23 13:01:09.060 19557 19637 E DodoBox : 🔴 [Providers] Unhandled rejection: Error: "CapacitorUpdater.then()" is not implemented on android: Error: "CapacitorUpdater.then()" is not implemented on android
+07-23 13:01:39.968 19557 19637 D DodoBox : 🔎 [useChats] refresh called, isAuthenticated=true
+07-23 13:01:39.968 19557 19637 D DodoBox : 🔎 [useChats] fetching chats...
+07-23 13:01:39.968 19557 19637 I DodoBox : 🟢 [MessagesPage] MessagesPage mounted
+07-23 13:01:40.725 19557 19637 D DodoBox : 🔎 [useChats] fetched 1 chats
+07-23 13:01:44.242 19557 19637 I DodoBox : 🟢 [NostrContext] Restored session from localStorage: username=david, pubkey=369fb4c44ec35958...
+07-23 13:01:44.243 19557 19637 E DodoBox : 🔴 [Providers] Unhandled rejection: [object Event]: [object Event]
+07-23 13:01:44.243 19557 19637 W DodoBox : 🟠 [NostrContext] Auto-logout triggered: session authenticated but private keys lost
+07-23 13:01:44.243 19557 19637 D DodoBox : 🔎 [NostrContext] identityPrivkeyRef=false, masterPrivkeyRef=false
+07-23 13:01:44.243 19557 19637 I DodoBox : 🟢 [Providers] App initialized
+07-23 13:01:44.243 19557 19637 W DodoBox : 🟠 [NostrContext] Executing auto-logout
+07-23 13:01:44.248 19557 19637 W DodoBox : 🟠 [NostrContext] Failed to load runtime config, using defaults: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+07-23 13:01:44.253 19557 19637 E DodoBox : 🔴 [Providers] Unhandled rejection: Error: "CapacitorUpdater.then()" is not implemented on android: Error: "CapacitorUpdater.then()" is not implemented on android
+
