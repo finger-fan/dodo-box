@@ -3,6 +3,7 @@
 // so that NEXT_PUBLIC_* build-time inlining is not required for deployment.
 
 import { createLogger } from '@/lib/logger'
+import { store, StorageKey } from '@/lib/storage'
 
 const log = createLogger('RuntimeConfig')
 
@@ -11,7 +12,6 @@ export interface RuntimeConfig {
 }
 
 const DEFAULT_RELAYS = 'wss://relay.damus.io'
-const USER_RELAYS_KEY = 'dodobox_user_relays'
 
 export async function getRuntimeConfig(): Promise<RuntimeConfig> {
   const url = '/api/config'
@@ -44,41 +44,27 @@ export function getDefaultRelays(): string[] {
 }
 
 /**
- * Get user-defined relays from localStorage. Falls back to empty array.
+ * Get user-defined relays. Falls back to empty array.
  */
 export function getUserRelays(): string[] {
   if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(USER_RELAYS_KEY)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((s): s is string => typeof s === 'string' && s.length > 0)
-  } catch {
-    return []
-  }
+  const parsed = store.get<unknown>(StorageKey.USER_RELAYS, []) ?? []
+  if (!Array.isArray(parsed)) return []
+  return parsed.filter((s): s is string => typeof s === 'string' && s.length > 0)
 }
 
 /**
- * Persist user-defined relays to localStorage.
+ * Persist user-defined relays.
  */
 export function setUserRelays(relays: readonly string[]): void {
   if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(USER_RELAYS_KEY, JSON.stringify(relays))
-  } catch {
-    // localStorage unavailable — non-critical
-  }
+  store.set(StorageKey.USER_RELAYS, [...relays])
 }
 
 /**
- * Clear user-defined relays from localStorage.
+ * Clear user-defined relays.
  */
 export function clearUserRelays(): void {
   if (typeof window === 'undefined') return
-  try {
-    localStorage.removeItem(USER_RELAYS_KEY)
-  } catch {
-    // non-critical
-  }
+  store.remove(StorageKey.USER_RELAYS)
 }

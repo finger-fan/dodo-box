@@ -16,14 +16,16 @@ import type { INostrAdapter, NostrSession } from './types'
 
 export type AdapterMode = 'real' | 'mock-telegram' | 'empty'
 
+import { store, StorageKey } from '@/lib/storage'
+
 export function getAdapterMode(): AdapterMode {
   if (typeof window === 'undefined') return 'empty'
-  return (localStorage.getItem('dodobox_adapter_mode') as AdapterMode) || 'real'
+  return store.get(StorageKey.ADAPTER_MODE, 'real') as AdapterMode
 }
 
 export function setAdapterMode(mode: AdapterMode) {
   if (typeof window === 'undefined') return
-  localStorage.setItem('dodobox_adapter_mode', mode)
+  store.set(StorageKey.ADAPTER_MODE, mode)
 }
 
 export function createNostrAdapter(session?: NostrSession, relayUrls?: string[]): INostrAdapter {

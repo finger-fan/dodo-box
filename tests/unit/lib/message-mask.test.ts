@@ -9,9 +9,8 @@ import {
   MASK_CHARSETS,
   DEFAULT_CHARSET_ID,
   DEFAULT_MASK_SECONDS,
-  MASK_SECONDS_KEY,
-  MASK_CHARSET_KEY,
 } from '@/lib/message-mask'
+import { StorageKey } from '@/lib/storage'
 
 describe('message-mask', () => {
   beforeEach(() => {
@@ -97,17 +96,17 @@ describe('message-mask', () => {
     })
 
     it('getMaskCharsetId falls back to default for unknown id', () => {
-      localStorage.setItem(MASK_CHARSET_KEY, 'unknown')
+      localStorage.setItem(StorageKey.MASK_CHARSET, 'unknown')
       expect(getMaskCharsetId()).toBe(DEFAULT_CHARSET_ID)
     })
 
     it('getMaskSeconds handles non-numeric gracefully', () => {
-      localStorage.setItem(MASK_SECONDS_KEY, 'not-a-number')
+      localStorage.setItem(StorageKey.MASK_SECONDS, 'not-a-number')
       expect(getMaskSeconds()).toBe(DEFAULT_MASK_SECONDS)
     })
 
     it('getMaskSeconds handles negative values gracefully', () => {
-      localStorage.setItem(MASK_SECONDS_KEY, '-5')
+      localStorage.setItem(StorageKey.MASK_SECONDS, '-5')
       expect(getMaskSeconds()).toBe(DEFAULT_MASK_SECONDS)
     })
   })

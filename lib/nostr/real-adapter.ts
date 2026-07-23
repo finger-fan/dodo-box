@@ -15,6 +15,7 @@ import { defaultAvatar, shortPubkey } from '@/lib/utils'
 import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-counter'
 import { loadCachedContacts, saveCachedContacts, saveCachedChats } from './contact-cache'
 import { createLogger } from '@/lib/logger'
+import { store, StorageKey } from '@/lib/storage'
 
 const log = createLogger('RealAdapter')
 
@@ -177,10 +178,10 @@ export class RealNostrAdapter implements INostrAdapter {
     try {
       const seq = incrementSeqCounter(this.session.currentPubkey, contactPubkey)
 
-      // Get TTL from localStorage (set in Settings page), fallback to env var
-      const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null
+      // Get TTL from store (set in Settings page), fallback to env var
+      const savedTtl = typeof window !== 'undefined' ? store.get(StorageKey.MESSAGE_TTL, 0) : 0
       const envTtl = process.env.NEXT_PUBLIC_DEFAULT_MESSAGE_TTL
-      const ttl = savedTtl ? parseInt(savedTtl, 10) : (envTtl ? parseInt(envTtl, 10) : 0)
+      const ttl = savedTtl || (envTtl ? parseInt(envTtl, 10) : 0)
       const expiration = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : undefined
 
       // Use JSON format { text: "..." } to match CLI format

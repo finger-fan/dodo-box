@@ -3,10 +3,7 @@
 
 import type { NostrContact, NostrChat } from './types'
 import { shortPubkey } from '@/lib/utils'
-
-const CONTACTS_CACHE_KEY = 'dodobox_contacts_cache'
-const CHATS_CACHE_KEY = 'dodobox_chats_cache'
-const CACHE_ENABLED_KEY = 'dodobox_contact_cache'
+import { store, StorageKey, type StorageKeyType } from '@/lib/storage'
 
 // Same control-char / shortPubkey patterns as real-adapter.ts
 const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\uFEFF]/g
@@ -21,30 +18,24 @@ function sanitizeCachedName(name: unknown, pubkey: string): string {
 
 export function isContactCacheEnabled(): boolean {
   if (typeof window === 'undefined') return false
-  try {
-    return localStorage.getItem(CACHE_ENABLED_KEY) === 'true'
-  } catch {
-    return false
-  }
+  return store.get<boolean>(StorageKey.CONTACT_CACHE, false) ?? false
 }
 
 export function setContactCacheEnabled(enabled: boolean): void {
   if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(CACHE_ENABLED_KEY, String(enabled))
-    if (!enabled) {
-      clearContactCache()
-    }
-  } catch {
-    // non-critical
+  store.set(StorageKey.CONTACT_CACHE, enabled)
+  if (!enabled) {
+    clearContactCache()
   }
 }
 
 function clearContactCache(): void {
+  // Clear all dynamic cache entries from the store's memory cache
+  // The store handles localStorage cleanup internally
   try {
     const keys = Object.keys(localStorage)
     for (const key of keys) {
-      if (key.startsWith(CONTACTS_CACHE_KEY) || key.startsWith(CHATS_CACHE_KEY)) {
+      if (key.startsWith(StorageKey.CONTACTS_CACHE) || key.startsWith(StorageKey.CHATS_CACHE)) {
         localStorage.removeItem(key)
       }
     }
@@ -53,30 +44,22 @@ function clearContactCache(): void {
   }
 }
 
-function loadCache<T>(key: string, pubkey: string): T[] {
+function loadCache<T>(prefix: StorageKeyType, pubkey: string): T[] {
   if (typeof window === 'undefined' || !isContactCacheEnabled()) return []
-  try {
-    const raw = localStorage.getItem(`${key}_${pubkey}`)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed as T[]
-  } catch {
-    return []
-  }
+  const key = `${prefix}_${pubkey}`
+  const parsed = store.get<unknown>(key, []) ?? []
+  if (!Array.isArray(parsed)) return []
+  return parsed as T[]
 }
 
-function saveCache<T>(key: string, pubkey: string, data: readonly T[]): void {
+function saveCache<T>(prefix: StorageKeyType, pubkey: string, data: readonly T[]): void {
   if (typeof window === 'undefined' || !isContactCacheEnabled()) return
-  try {
-    localStorage.setItem(`${key}_${pubkey}`, JSON.stringify(data))
-  } catch {
-    // localStorage full or unavailable — non-critical
-  }
+  const key = `${prefix}_${pubkey}`
+  store.set(key, data)
 }
 
 export function loadCachedContacts(pubkey: string): NostrContact[] {
-  const contacts = loadCache<NostrContact>(CONTACTS_CACHE_KEY, pubkey)
+  const contacts = loadCache<NostrContact>(StorageKey.CONTACTS_CACHE, pubkey)
   return contacts.map(c => ({
     ...c,
     name: sanitizeCachedName(c.name, c.pubkey),
@@ -84,13 +67,13 @@ export function loadCachedContacts(pubkey: string): NostrContact[] {
 }
 
 export function saveCachedContacts(pubkey: string, contacts: readonly NostrContact[]): void {
-  saveCache(CONTACTS_CACHE_KEY, pubkey, contacts)
+  saveCache(StorageKey.CONTACTS_CACHE, pubkey, contacts)
 }
 
 export function loadCachedChats(pubkey: string): NostrChat[] {
-  return loadCache<NostrChat>(CHATS_CACHE_KEY, pubkey)
+  return loadCache<NostrChat>(StorageKey.CHATS_CACHE, pubkey)
 }
 
 export function saveCachedChats(pubkey: string, chats: readonly NostrChat[]): void {
-  saveCache(CHATS_CACHE_KEY, pubkey, chats)
+  saveCache(StorageKey.CHATS_CACHE, pubkey, chats)
 }

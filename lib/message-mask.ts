@@ -1,8 +1,7 @@
 // message-mask.ts — 聊天气泡「阅后遮罩」配置与工具
 // 消息明文显示设定秒数后，被随机遮罩字符替换；点击可恢复明文。
 
-export const MASK_SECONDS_KEY = 'dodobox_mask_seconds';
-export const MASK_CHARSET_KEY = 'dodobox_mask_charset';
+import { store, StorageKey } from '@/lib/storage';
 
 // 自定义事件名：同标签页内设置变更时派发，供聊天页实时响应
 export const MASK_SETTINGS_EVENT = 'dodobox:mask-settings-changed';
@@ -33,45 +32,26 @@ export function getCharsById(id: string): string {
 
 export function getMaskSeconds(): number {
   if (typeof window === 'undefined') return DEFAULT_MASK_SECONDS;
-  try {
-    const raw = localStorage.getItem(MASK_SECONDS_KEY);
-    if (raw === null) return DEFAULT_MASK_SECONDS;
-    const n = Number(raw);
-    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_MASK_SECONDS;
-  } catch {
-    return DEFAULT_MASK_SECONDS;
-  }
+  const n = store.get<number>(StorageKey.MASK_SECONDS, DEFAULT_MASK_SECONDS) ?? DEFAULT_MASK_SECONDS;
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_MASK_SECONDS;
 }
 
 export function setMaskSeconds(seconds: number): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(MASK_SECONDS_KEY, String(seconds));
-    window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
-  } catch {
-    // localStorage 不可用 — 非关键
-  }
+  store.set(StorageKey.MASK_SECONDS, seconds);
+  window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
 }
 
 export function getMaskCharsetId(): string {
   if (typeof window === 'undefined') return DEFAULT_CHARSET_ID;
-  try {
-    const raw = localStorage.getItem(MASK_CHARSET_KEY);
-    if (!raw) return DEFAULT_CHARSET_ID;
-    return MASK_CHARSETS.some((c) => c.id === raw) ? raw : DEFAULT_CHARSET_ID;
-  } catch {
-    return DEFAULT_CHARSET_ID;
-  }
+  const raw = store.get<string>(StorageKey.MASK_CHARSET, DEFAULT_CHARSET_ID) ?? DEFAULT_CHARSET_ID;
+  return MASK_CHARSETS.some((c) => c.id === raw) ? raw : DEFAULT_CHARSET_ID;
 }
 
 export function setMaskCharsetId(id: string): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(MASK_CHARSET_KEY, id);
-    window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
-  } catch {
-    // 非关键
-  }
+  store.set(StorageKey.MASK_CHARSET, id);
+  window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
 }
 
 /**

@@ -10,6 +10,7 @@ import GeneralSettings from '@/components/settings/GeneralSettings';
 import { useNostr } from '@/contexts/NostrContext';
 import { useTranslation } from 'react-i18next';
 import { version } from '@/package.json';
+import { store, StorageKey } from '@/lib/storage';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,10 +32,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (localStorage.getItem('dodobox_refresh_logout') === 'true') {
+    if (store.get(StorageKey.REFRESH_LOGOUT, false)) {
       const message = t('auth.refresh_logout');
       queueMicrotask(() => setToast({ message, type: 'info' }));
-      localStorage.removeItem('dodobox_refresh_logout');
+      store.remove(StorageKey.REFRESH_LOGOUT);
     }
   }, [t]);
 

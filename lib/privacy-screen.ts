@@ -6,8 +6,7 @@
  */
 
 import { PrivacyScreen } from '@capacitor/privacy-screen';
-
-const SCREENSHOT_ALLOWED_KEY = 'dodobox_allow_screenshot';
+import { store, StorageKey } from '@/lib/storage';
 
 /**
  * 获取用户是否允许截屏的偏好设置
@@ -15,11 +14,7 @@ const SCREENSHOT_ALLOWED_KEY = 'dodobox_allow_screenshot';
  */
 export function isScreenshotAllowed(): boolean {
   if (typeof window === 'undefined') return false;
-  try {
-    return localStorage.getItem(SCREENSHOT_ALLOWED_KEY) === 'true';
-  } catch {
-    return false;
-  }
+  return store.get<boolean>(StorageKey.ALLOW_SCREENSHOT, false) ?? false;
 }
 
 /**
@@ -28,11 +23,7 @@ export function isScreenshotAllowed(): boolean {
  */
 export function setScreenshotAllowed(allowed: boolean): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(SCREENSHOT_ALLOWED_KEY, String(allowed));
-  } catch {
-    // non-critical
-  }
+  store.set(StorageKey.ALLOW_SCREENSHOT, allowed);
 }
 
 /**

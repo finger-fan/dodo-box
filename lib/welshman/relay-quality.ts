@@ -1,7 +1,7 @@
 // relay-quality.ts - Relay quality scoring based on response metrics
 // Tracks latency, error rate, and uptime to score relay reliability
 
-const QUALITY_STORAGE_KEY = 'dodobox_relay_quality'
+import { store, StorageKey } from '@/lib/storage'
 
 interface RelayMetrics {
   successCount: number
@@ -16,30 +16,20 @@ const metrics = new Map<string, RelayMetrics>()
 function loadMetrics(): void {
   if (typeof window === 'undefined') return
 
-  try {
-    const raw = localStorage.getItem(QUALITY_STORAGE_KEY)
-    if (!raw) return
-    const parsed: Record<string, RelayMetrics> = JSON.parse(raw)
-    for (const [url, m] of Object.entries(parsed)) {
-      metrics.set(url, m)
-    }
-  } catch {
-    // non-critical
+  const parsed = store.get<Record<string, RelayMetrics>>(StorageKey.RELAY_QUALITY, {}) ?? {}
+  for (const [url, m] of Object.entries(parsed)) {
+    metrics.set(url, m)
   }
 }
 
 function saveMetrics(): void {
   if (typeof window === 'undefined') return
 
-  try {
-    const obj: Record<string, RelayMetrics> = {}
-    for (const [url, m] of metrics.entries()) {
-      obj[url] = m
-    }
-    localStorage.setItem(QUALITY_STORAGE_KEY, JSON.stringify(obj))
-  } catch {
-    // non-critical
+  const obj: Record<string, RelayMetrics> = {}
+  for (const [url, m] of metrics.entries()) {
+    obj[url] = m
   }
+  store.set(StorageKey.RELAY_QUALITY, obj)
 }
 
 // Load on module init (client-side only)
@@ -117,6 +107,6 @@ export function getAllRelayQualities(): Array<{ url: string; quality: number }> 
 export function clearRelayQuality(): void {
   metrics.clear()
   if (typeof window !== 'undefined') {
-    localStorage.removeItem(QUALITY_STORAGE_KEY)
+    store.remove(StorageKey.RELAY_QUALITY)
   }
 }

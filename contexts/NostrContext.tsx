@@ -23,6 +23,7 @@ import { getConnectedRelays } from '@/lib/welshman/relay-manager'
 import { createNostrAdapter, getAdapterMode, setAdapterMode, type AdapterMode } from '@/lib/nostr'
 import { getRuntimeConfig, getDefaultRelays, getUserRelays } from '@/lib/runtime-config'
 import { createLogger } from '@/lib/logger'
+import { store, StorageKey } from '@/lib/storage'
 import type {
   NostrSession,
   VaultData,
@@ -32,8 +33,6 @@ import type {
 } from '@/lib/nostr/types'
 
 const log = createLogger('NostrContext')
-
-const SESSION_STORAGE_KEY = 'dodobox_session'
 
 interface NostrContextValue {
   session: NostrSession
@@ -78,20 +77,13 @@ function loadPersistedSession(): PersistedSession {
   if (typeof window === 'undefined') {
     return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
   }
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY)
-    if (!raw) {
-      log.debug('No session found in localStorage')
-      return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
-    }
-    log.debug(`Raw session from localStorage: ${raw.slice(0, 100)}...`)
-    const parsed = JSON.parse(raw) as PersistedSession
-    log.debug(`Parsed session: isAuthenticated=${parsed.isAuthenticated}, username=${parsed.username}, hasPubkey=${!!parsed.currentPubkey}`)
-    return parsed
-  } catch (err) {
-    log.error('Failed to parse session from localStorage', err)
+  const parsed = store.get<PersistedSession | null>(StorageKey.SESSION, null)
+  if (!parsed) {
+    log.debug('No session found in store')
     return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
   }
+  log.debug(`Parsed session: isAuthenticated=${parsed.isAuthenticated}, username=${parsed.username}, hasPubkey=${!!parsed.currentPubkey}`)
+  return parsed
 }
 
 export function NostrProvider({ children }: { children: ReactNode }) {
@@ -101,8 +93,8 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     // In mock-telegram mode, auto-create a dummy session
     if (initialAdapterMode === 'mock-telegram') {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('dodobox_account_active', 'true')
-        localStorage.setItem('dodobox_current_user', 'mock-user')
+        store.set(StorageKey.ACCOUNT_ACTIVE, true)
+        store.set(StorageKey.CURRENT_USER, 'mock-user')
       }
       log.info('Initialized with mock-telegram mode')
       return {
@@ -184,20 +176,13 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
   function persistSession(s: NostrSession & { masterPubkey?: string }) {
     if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(
-        SESSION_STORAGE_KEY,
-        JSON.stringify({
-          isAuthenticated: s.isAuthenticated,
-          username: s.username,
-          currentPubkey: s.currentPubkey,
-          masterPubkey: s.masterPubkey,
-          vaultData: null,
-        })
-      )
-    } catch (err) {
-      log.warn(`Failed to persist session to localStorage: ${err}`)
-    }
+    store.set(StorageKey.SESSION, {
+      isAuthenticated: s.isAuthenticated,
+      username: s.username,
+      currentPubkey: s.currentPubkey,
+      masterPubkey: s.masterPubkey,
+      vaultData: null,
+    })
   }
 
   async function ensureRelays(): Promise<string[]> {
@@ -391,9 +376,9 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     identityPrivkeyRef.current = null
     setSession(EMPTY_SESSION)
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(SESSION_STORAGE_KEY)
-      localStorage.removeItem('dodobox_account_active')
-      localStorage.removeItem('dodobox_current_user')
+      store.remove(StorageKey.SESSION)
+      store.remove(StorageKey.ACCOUNT_ACTIVE)
+      store.remove(StorageKey.CURRENT_USER)
     }
     const newAdapter = createNostrAdapter()
     setAdapter(newAdapter)
@@ -585,8 +570,8 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       }
       setSession(mockSession)
       if (typeof window !== 'undefined') {
-        localStorage.setItem('dodobox_account_active', 'true')
-        localStorage.setItem('dodobox_current_user', 'mock-user')
+        store.set(StorageKey.ACCOUNT_ACTIVE, true)
+        store.set(StorageKey.CURRENT_USER, 'mock-user')
       }
       setAdapter(createNostrAdapter(mockSession))
     } else {
@@ -596,9 +581,9 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       identityPrivkeyRef.current = null
       setSession(EMPTY_SESSION)
       if (typeof window !== 'undefined') {
-        localStorage.removeItem(SESSION_STORAGE_KEY)
-        localStorage.removeItem('dodobox_account_active')
-        localStorage.removeItem('dodobox_current_user')
+        store.remove(StorageKey.SESSION)
+        store.remove(StorageKey.ACCOUNT_ACTIVE)
+        store.remove(StorageKey.CURRENT_USER)
       }
       setAdapter(createNostrAdapter())
     }
