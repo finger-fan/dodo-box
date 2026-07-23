@@ -54,11 +54,11 @@ test.describe('Navigation', () => {
     await loginPage.registerAndLogin(user.username, user.password)
     await page.waitForURL(/\/messages/, { timeout: 30_000 })
 
-    // Navigate to contacts via bottom nav link
-    await page.locator('nav a[href="/contacts"]').click()
-    await expect(page).toHaveURL(/\/contacts/, { timeout: 5000 })
+    // Navigate to discover via bottom nav link
+    await page.locator('nav a[href="/discover"]').click()
+    await expect(page).toHaveURL(/\/discover/, { timeout: 5000 })
 
-    // Navigate back to messages
+    // Navigate back to messages (contacts merged into messages)
     await page.locator('nav a[href="/messages"]').click()
     await expect(page).toHaveURL(/\/messages/, { timeout: 5000 })
   })

@@ -11,34 +11,26 @@ export class MessagesPage {
   }
 
   /**
-   * Open a chat by navigating to contacts and clicking a contact.
-   * @param contactLabel - Contact name (e.g. "Bob") or pubkey prefix to locate the row
+   * Open a chat by clicking a contact in the messages list.
+   * (Contacts were merged into the messages page; each contact is a chat item.)
+   * @param contactLabel - Contact name (e.g. "Bob") used to locate the chat item by its visible text
    */
   async openChatViaContacts(contactLabel: string) {
-    // Navigate to contacts via bottom nav
-    await this.page.locator('nav a[href="/contacts"]').click()
-    await this.page.waitForURL('**/contacts', { timeout: 10_000, waitUntil: 'commit' })
+    // Contacts now live on the messages page
+    await this.navigate()
 
-    // Wait for contacts to load
+    // Wait for contacts/chats to load
     await this.page.waitForTimeout(2000)
 
-    // Find the contact row by name or pubkey prefix shown in the contact list.
-    // Contact structure: font-semibold (name), font-mono (pubkey prefix)
-    // Try name first (font-semibold), then fall back to pubkey prefix (font-mono)
-    const nameEl = this.page.locator(`.font-semibold:has-text("${contactLabel}")`)
-    const monoEl = this.page.locator(`.font-mono:has-text("${contactLabel}")`)
+    // Find the chat item whose visible text contains the contact name
+    const item = this.page
+      .locator('[data-testid="chat-item"]')
+      .filter({ hasText: contactLabel })
+      .first()
+    await item.waitFor({ state: 'visible', timeout: 10_000 })
 
-    let targetEl = nameEl
-    if (await nameEl.isVisible().catch(() => false)) {
-      targetEl = nameEl
-    } else {
-      targetEl = monoEl
-    }
-    await targetEl.waitFor({ state: 'visible', timeout: 10_000 })
-
-    // Click the parent clickable div (two levels up: font-semibold > div.flex-1 > div[onClick])
     // Use force:true to bypass Framer Motion drag handler on SwipeableListItem
-    await targetEl.locator('..').locator('..').click({ force: true })
+    await item.click({ force: true })
 
     // Wait for navigation to chat page (client-side)
     await this.page.waitForURL(/\/chat\?peer=/, { timeout: 15_000, waitUntil: 'commit' })

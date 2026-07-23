@@ -32,9 +32,8 @@ graph TB
     subgraph Presentation["🎨 表现层 (Presentation)"]
         direction TB
         P1["📄 /login<br/>登录/注册"]
-        P2["💬 /messages<br/>聊天列表"]
+        P2["💬 /messages<br/>聊天列表 + 联系人管理"]
         P3["💬 /chat?peer=<br/>聊天会话"]
-        P4["👥 /contacts<br/>联系人管理"]
         P5["🔍 /discover<br/>频道发现"]
         P6["⚙️ /settings<br/>身份/主题/中继"]
 
@@ -141,9 +140,8 @@ graph TB
 graph LR
     subgraph Pages["页面路由"]
         Login["/login<br/>登录注册"]
-        Messages["/(main)/messages<br/>聊天列表"]
+        Messages["/(main)/messages<br/>聊天列表 + 联系人管理"]
         ChatDetail["/(main)/chat?peer=<br/>聊天会话"]
-        Contacts["/(main)/contacts<br/>联系人管理"]
         Discover["/(main)/discover<br/>频道发现"]
         Settings["/(main)/settings<br/>设置"]
     end
@@ -157,7 +155,6 @@ graph LR
     Root --> Main
     Main --> Messages
     Main --> ChatDetail
-    Main --> Contacts
     Main --> Discover
     Main --> Settings
 ```

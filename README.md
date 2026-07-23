@@ -37,9 +37,8 @@ npm run dev
 |------|------|
 | `/` | 重定向到 `/login` |
 | `/login` | 账户创建与登录（通过模拟 KDF 派生凭证） |
-| `/(main)/messages` | 聊天列表 |
+| `/(main)/messages` | 聊天列表与联系人管理（联系人已并入，支持滑动操作） |
 | `/(main)/chat?peer=<pubkey>` | 单个聊天会话(查询参数形式) |
-| `/(main)/contacts` | 联系人管理（支持滑动操作） |
 | `/(main)/discover` | 发现页（可订阅频道的内容流） |
 | `/(main)/settings` | 身份管理、主题、语言、中继配置 |
 

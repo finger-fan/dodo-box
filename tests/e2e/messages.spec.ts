@@ -29,14 +29,14 @@ test.describe('Messages page', () => {
     expect(count).toBe(0)
   })
 
-  test('has search button in header', async ({ page }) => {
-    await expect(page.locator('header button')).toBeVisible()
+  test('has add contact button in header', async ({ page }) => {
+    await expect(page.locator('[data-testid="add-contact-btn"]')).toBeVisible()
   })
 
   test('has bottom navigation', async ({ page }) => {
     await expect(page.locator('nav')).toBeVisible()
     await expect(page.locator('nav a[href="/messages"]')).toBeVisible()
-    await expect(page.locator('nav a[href="/contacts"]')).toBeVisible()
+    await expect(page.locator('nav a[href="/discover"]')).toBeVisible()
     await expect(page.locator('nav a[href="/settings"]')).toBeVisible()
   })
 })

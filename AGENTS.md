@@ -70,9 +70,8 @@ pnpm test:all      # 运行全部测试
 
 - `/` - 重定向到 `/login`
 - `/login` - 账户创建/登录（在 localStorage 中存储 `dodobox_account_active`）
-- `/(main)/messages` - 聊天列表
+- `/(main)/messages` - 聊天列表与联系人管理（联系人页已并入：右上角 Plus 按钮添加联系人，列表项支持滑动删除）
 - `/(main)/chat?peer=<pubkey>` - 单个聊天会话(查询参数形式,静态导出下避免动态路由导致整页重载)
-- `/(main)/contacts` - 联系人管理
 - `/(main)/discover` - 发现页（频道订阅与帖子流）
 - `/(main)/settings` - 应用设置（身份管理、主题、语言、中继配置）
 

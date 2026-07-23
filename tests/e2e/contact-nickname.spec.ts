@@ -38,7 +38,7 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
       await loginPage.login(username, password)
     }
     // Should now be on an authenticated page
-    await page.waitForURL(/\/(messages|contacts|settings|discover)/, { timeout: 30_000, waitUntil: 'commit' })
+    await page.waitForURL(/\/(messages|settings|discover)/, { timeout: 30_000, waitUntil: 'commit' })
   }
 
   test('nickname set via identity protocol displays correctly', async ({ alice, bob }) => {
@@ -53,7 +53,7 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
 
     // Verify "Bob" appears as the contact name (not garbled, not npub prefix)
     await expect(
-      alice.page.locator('.font-semibold:has-text("Bob")')
+      alice.page.locator('.font-bold:has-text("Bob")')
     ).toBeVisible({ timeout: 10_000 })
 
     // Verify no garbled patterns in any displayed contact name
@@ -77,7 +77,7 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
     // The contact should show a truncated npub (shortPubkey format: "npub1xxx...yyy")
     // It should NOT show garbled chars or an empty name
     const allNames = await alice.page
-      .locator('.flex.items-center.gap-4 .font-semibold')
+      .locator('.flex.items-center.gap-4 .font-bold')
       .allTextContents()
 
     // At least one name should match the shortPubkey pattern (npub1...xxx)
@@ -94,7 +94,7 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
     await snap(alice.page, 'nickname-npub-after-reload')
 
     const reloadedNames = await alice.page
-      .locator('.flex.items-center.gap-4 .font-semibold')
+      .locator('.flex.items-center.gap-4 .font-bold')
       .allTextContents()
 
     // shortPubkey should still appear (relay should NOT have stored the display string as petname)
@@ -120,12 +120,12 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
 
     // Alice sees "Bob"
     await expect(
-      alice.page.locator('.font-semibold:has-text("Bob")')
+      alice.page.locator('.font-bold:has-text("Bob")')
     ).toBeVisible({ timeout: 10_000 })
 
     // Bob sees "Alice"
     await expect(
-      bob.page.locator('.font-semibold:has-text("Alice")')
+      bob.page.locator('.font-bold:has-text("Alice")')
     ).toBeVisible({ timeout: 10_000 })
 
     // Both reload and re-verify
@@ -144,11 +144,11 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
 
     // After round-trip through relay, nicknames should still be correct
     await expect(
-      alice.page.locator('.font-semibold:has-text("Bob")')
+      alice.page.locator('.font-bold:has-text("Bob")')
     ).toBeVisible({ timeout: 15_000 })
 
     await expect(
-      bob.page.locator('.font-semibold:has-text("Alice")')
+      bob.page.locator('.font-bold:has-text("Alice")')
     ).toBeVisible({ timeout: 15_000 })
 
     // No garbled names on either side
@@ -166,7 +166,7 @@ test.describe('Contact nickname display (garbled nickname regression)', () => {
  */
 async function assertNoGarbledNames(page: import('@playwright/test').Page) {
   const allNames = await page
-    .locator('.flex.items-center.gap-4 .font-semibold')
+    .locator('.flex.items-center.gap-4 .font-bold')
     .allTextContents()
 
   for (const text of allNames) {

@@ -1,12 +1,21 @@
 import type { Page } from '@playwright/test'
 
+/**
+ * Contacts page object.
+ *
+ * Contacts were merged into the messages page (`/messages`): the contact
+ * list is the chat list and the add-contact modal opens from the header
+ * Plus button. The API of this page object is kept unchanged.
+ */
 export class ContactsPage {
   constructor(private readonly page: Page) {}
 
-  /** Navigate to contacts via bottom nav (preserves in-memory session) */
+  /** Navigate to the contacts list (now the messages page) via bottom nav */
   async navigate() {
-    await this.page.locator('nav a[href="/contacts"]').click()
-    await this.page.waitForURL('**/contacts', { timeout: 10_000, waitUntil: 'commit' })
+    if (!this.page.url().includes('/messages')) {
+      await this.page.locator('nav a[href="/messages"]').click()
+      await this.page.waitForURL('**/messages', { timeout: 10_000, waitUntil: 'commit' })
+    }
   }
 
   /**
@@ -14,7 +23,7 @@ export class ContactsPage {
    */
   async addContact(pubkeyOrIdentityUrl: string) {
     // Click the add button (Plus icon in header)
-    await this.page.locator('button:has(svg.lucide-plus)').click()
+    await this.page.locator('[data-testid="add-contact-btn"]').click()
 
     // Wait for modal to appear
     const textarea = this.page.getByPlaceholder(/dodobox:\/\/identity/i)
