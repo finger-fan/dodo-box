@@ -4,9 +4,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   UserCircle, LogOut, Shield,
-  Trash2, Download, ChevronRight, Clock,
+  Trash2, Download, ChevronRight, ChevronDown, Clock,
   RefreshCw, RotateCcw, Loader2,
-  Server, EyeOff, Type,
+  EyeOff, Type,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Toast from '@/components/ui/Toast';
@@ -15,6 +15,7 @@ import GeneralSettings from '@/components/settings/GeneralSettings';
 import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
+import { store, StorageKey } from '@/lib/storage';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
@@ -55,12 +56,8 @@ export default function SettingsPage() {
   const mounted = useMounted();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [messageTtl, setMessageTtl] = useState(() => {
-    try {
-      const savedTtl = typeof window !== 'undefined' ? localStorage.getItem('dodobox_message_ttl') : null;
-      return savedTtl ? Number(savedTtl) : 2592000;
-    } catch {
-      return 2592000;
-    }
+    if (typeof window === 'undefined') return 2592000;
+    return store.get(StorageKey.MESSAGE_TTL, 2592000);
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
@@ -116,11 +113,7 @@ export default function SettingsPage() {
 
   const handleTtlChange = (value: number) => {
     setMessageTtl(value);
-    try {
-      localStorage.setItem('dodobox_message_ttl', String(value));
-    } catch (err) {
-      console.warn('[Settings] Failed to save message TTL to localStorage:', err);
-    }
+    store.set(StorageKey.MESSAGE_TTL, value);
     setIsTtlOpen(false);
   };
 
@@ -185,75 +178,17 @@ export default function SettingsPage() {
             <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-bold">{t('common.logout')}</span>
-          </button>
         </section>
 
         {/* Preferences */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.preferences')}</div>
           <GeneralSettings onToast={handleToast} />
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5 text-zinc-400" />
-                <div>
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.contact_cache')}</span>
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.contact_cache_desc')}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  const next = !cacheEnabled;
-                  setContactCacheEnabled(next);
-                  setCacheEnabled(next);
-                }}
-                className={cn(
-                  "relative w-10 h-6 rounded-full transition-colors",
-                  cacheEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
-                )}
-              >
-                <span className={cn(
-                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
-                  cacheEnabled ? "left-[18px]" : "left-0.5"
-                )} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
-              <div className="flex items-center gap-3">
-                <Server className="w-5 h-5 text-zinc-400" />
-                <div>
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Connection Mode</span>
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">
-                    {adapterMode === 'mock-telegram' ? 'Using Mock Telegram' : 'Using Nostr Relays'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button
-                  onClick={() => handleAdapterModeChange('real')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    adapterMode === 'real' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >Nostr</button>
-                <button
-                  onClick={() => handleAdapterModeChange('mock-telegram')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded shadow-sm transition-all",
-                    adapterMode === 'mock-telegram' ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "text-zinc-400"
-                  )}
-                >Mock</button>
-              </div>
-            </div>
-          </div>
+        </section>
 
-          {/* Privacy Mask */}
+        {/* Display */}
+        <section className="space-y-3">
+          <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.display', 'Display')}</div>
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-3xl">
             <div className="p-4 border-b border-zinc-50 dark:border-zinc-800 relative">
               <div className="flex items-center justify-between">
@@ -266,9 +201,10 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => { setIsMaskSecondsOpen(!isMaskSecondsOpen); setIsMaskCharsetOpen(false); }}
-                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 >
                   {t(currentMaskSecondsLabel)}
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isMaskSecondsOpen && "rotate-180")} />
                 </button>
               </div>
               {isMaskSecondsOpen && (
@@ -298,9 +234,10 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => { setIsMaskCharsetOpen(!isMaskCharsetOpen); setIsMaskSecondsOpen(false); }}
-                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 >
                   {t(currentMaskCharsetLabel)}
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isMaskCharsetOpen && "rotate-180")} />
                 </button>
               </div>
               {isMaskCharsetOpen && (
@@ -328,7 +265,32 @@ export default function SettingsPage() {
         {/* Privacy */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.privacy')}</div>
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.contact_cache')}</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.contact_cache_desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !cacheEnabled;
+                  setContactCacheEnabled(next);
+                  setCacheEnabled(next);
+                }}
+                className={cn(
+                  "relative w-10 h-6 rounded-full transition-colors",
+                  cacheEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  cacheEnabled ? "left-[18px]" : "left-0.5"
+                )} />
+              </button>
+            </div>
             <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
               <div className="flex items-center gap-3">
                 <EyeOff className="w-5 h-5 text-zinc-400" />
@@ -362,9 +324,10 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setIsTtlOpen(!isTtlOpen)}
-                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 >
                   {t(currentTtlLabel)}
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isTtlOpen && "rotate-180")} />
                 </button>
               </div>
               {isTtlOpen && (
@@ -440,6 +403,17 @@ export default function SettingsPage() {
             </div>
           </section>
         )}
+
+        {/* Logout Button */}
+        <div className="mt-8">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-bold">{t('common.logout')}</span>
+          </button>
+        </div>
       </div>
 
       <IdentityModal

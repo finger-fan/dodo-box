@@ -196,14 +196,14 @@ export default function ChatView() {
           <ChevronLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
         </button>
         {chatAvatar && (
-          <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
+          <div className="w-8 h-8 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
             <Image src={chatAvatar} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
           </div>
         )}
         <div className="flex-1 min-w-0">
           <div className="header-name font-bold text-zinc-900 dark:text-zinc-100 truncate">{chatName}</div>
-          <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{t('chat.online')}</div>
         </div>
+        <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{t('chat.online')}</div>
       </header>
 
       {/* Messages Stream */}
@@ -243,7 +243,7 @@ export default function ChatView() {
                   )}
                 >
                   <div className={cn(
-                    "bubble px-4 py-2.5 rounded-2xl text-sm shadow-sm",
+                    "bubble px-3 py-2 rounded-2xl text-sm shadow-sm",
                     msg.sender === 'me'
                       ? "mine bg-emerald-600 text-white rounded-tr-none"
                       : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-tl-none border border-zinc-100 dark:border-zinc-800"
