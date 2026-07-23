@@ -1,6 +1,7 @@
 {
   "name": "dodo-box",
   "version": "0.9.9",
+  "build": "607240117",
   "private": true,
   "scripts": {
     "dev": "next dev",

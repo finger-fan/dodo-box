@@ -371,7 +371,10 @@ export default function SettingsPage() {
                     <RefreshCw className="w-5 h-5 text-zinc-400" />
                     <div>
                       <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('updater.current_version')}</span>
-                      <span className="ml-2 text-xs font-mono text-zinc-500">{process.env.NEXT_PUBLIC_APP_VERSION ?? '-'}</span>
+                      <span className="ml-2 text-xs font-mono text-zinc-500">
+                        {process.env.NEXT_PUBLIC_APP_VERSION ?? '-'}
+                        {process.env.NEXT_PUBLIC_APP_BUILD ? ` (${process.env.NEXT_PUBLIC_APP_BUILD})` : ''}
+                      </span>
                     </div>
                   </div>
                 </div>

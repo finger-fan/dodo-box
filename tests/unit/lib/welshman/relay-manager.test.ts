@@ -1,5 +1,5 @@
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   connectToRelays,
   getConnectedRelays,
@@ -9,8 +9,22 @@ import {
   initRelayManager,
   closeAllRelays,
   waitForRelayConnection,
+  subscribe,
+  probeRelay,
 } from '@/lib/welshman/relay-manager'
-import { SocketStatus, SocketEvent } from '@welshman/net'
+import { SocketStatus, SocketEvent, Tracker } from '@welshman/net'
+
+vi.mock('@welshman/net', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@welshman/net')>()
+  return {
+    ...actual,
+    request: vi.fn(() => Promise.resolve([])),
+    publish: vi.fn(() => Promise.resolve({})),
+  }
+})
+
+import { request as welshmanRequest } from '@welshman/net'
+const requestMock = vi.mocked(welshmanRequest)
 
 const RELAY_URL = 'wss://relay.example.com'
 
@@ -263,5 +277,108 @@ describe('relay-manager status callbacks', () => {
     // socket.on should only have been called once for SocketEvent.Status
     const statusCalls = socket.on.mock.calls.filter((call: any) => call[0] === SocketEvent.Status)
     expect(statusCalls.length).toBe(1)
+  })
+})
+
+describe('relay-manager subscriptions', () => {
+  const RELAY = 'wss://sub.example.com'
+
+  function setupPool(status: SocketStatus = SocketStatus.Open) {
+    const socket = createMockSocket(status)
+    const pool = {
+      _data: new Map([[RELAY, socket]]),
+      get: vi.fn().mockReturnValue(socket),
+      subscribe: vi.fn(),
+      clear: vi.fn(),
+    }
+    vi.mocked(engine.getPool).mockReturnValue(pool as any)
+    return { socket, pool }
+  }
+
+  function getStatusListener(socket: ReturnType<typeof createMockSocket>) {
+    const listener = socket.on.mock.calls.find((call: any) => call[0] === SocketEvent.Status)?.[1]
+    expect(listener).toBeDefined()
+    return listener as (status: SocketStatus) => void
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(engine.getTracker).mockReturnValue(new Tracker() as any)
+    setupPool()
+    closeAllRelays() // reset module-level registries between tests
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('subscribe issues a REQ and does not duplicate it on first connect', () => {
+    const { socket } = setupPool(SocketStatus.Closed)
+    connectToRelays([RELAY])
+    const onStatus = getStatusListener(socket)
+
+    subscribe([{ kinds: [1059] }], [RELAY], vi.fn())
+    expect(requestMock).toHaveBeenCalledTimes(1)
+
+    // First connect: the REQ was just sent, no re-issue
+    onStatus(SocketStatus.Opening)
+    onStatus(SocketStatus.Open)
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-issues the REQ when the relay reconnects after a drop', () => {
+    const { socket } = setupPool(SocketStatus.Closed)
+    connectToRelays([RELAY])
+    const onStatus = getStatusListener(socket)
+
+    subscribe([{ kinds: [1059] }], [RELAY], vi.fn())
+    onStatus(SocketStatus.Open)
+    expect(requestMock).toHaveBeenCalledTimes(1)
+
+    // Socket drops and reconnects: welshman does not re-send REQs, we must
+    onStatus(SocketStatus.Closed)
+    onStatus(SocketStatus.Opening)
+    onStatus(SocketStatus.Open)
+    expect(requestMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops re-issuing after the subscription is aborted', () => {
+    const { socket } = setupPool(SocketStatus.Closed)
+    connectToRelays([RELAY])
+    const onStatus = getStatusListener(socket)
+
+    const controller = subscribe([{ kinds: [1059] }], [RELAY], vi.fn())
+    onStatus(SocketStatus.Open)
+    controller.abort()
+
+    onStatus(SocketStatus.Closed)
+    onStatus(SocketStatus.Open)
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('probe recycles a zombie socket when no EOSE arrives', () => {
+    vi.useFakeTimers()
+    const { socket } = setupPool(SocketStatus.Open)
+
+    probeRelay(RELAY)
+    vi.advanceTimersByTime(10_000)
+
+    expect(socket.close).toHaveBeenCalled()
+    expect(socket.open).toHaveBeenCalled()
+  })
+
+  it('probe leaves a healthy socket alone when EOSE arrives', () => {
+    vi.useFakeTimers()
+    const { socket } = setupPool(SocketStatus.Open)
+    requestMock.mockImplementationOnce((options: any) => {
+      options.onEose?.(RELAY)
+      return Promise.resolve([])
+    })
+
+    probeRelay(RELAY)
+    vi.advanceTimersByTime(10_000)
+
+    expect(socket.close).not.toHaveBeenCalled()
+    expect(socket.open).not.toHaveBeenCalled()
   })
 })

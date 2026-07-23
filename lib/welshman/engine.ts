@@ -2,6 +2,7 @@
 
 import { Repository, Pool, Tracker, WrapManager, netContext } from '@welshman/net'
 import type { TrustedEvent } from '@welshman/util'
+import { ensurePolyfills } from './polyfills'
 
 let initialized = false
 
@@ -17,6 +18,8 @@ let wrapManager: WrapManager | null = null
  */
 export function initEngine(options?: { nodeMode?: boolean }): void {
   if (initialized) return
+
+  ensurePolyfills()
 
   const nodeMode = options?.nodeMode ?? false
 

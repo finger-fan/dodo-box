@@ -18,19 +18,28 @@ function getVersionFromGradle() {
   return match[1];
 }
 
-// Find the APK file
+// Find the APK file (newest by mtime — the output dir can hold several
+// dated APKs and alphabetical order would pick the oldest date)
 function findApk() {
   const apkDir = path.join(root, 'android', 'app', 'build', 'outputs', 'apk', 'release');
-  const files = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
+  const files = fs.readdirSync(apkDir)
+    .filter(f => f.endsWith('.apk'))
+    .map(f => ({ name: f, mtime: fs.statSync(path.join(apkDir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
   if (files.length === 0) {
     throw new Error('No APK found in release directory');
   }
-  return path.join(apkDir, files[0]);
+  return path.join(apkDir, files[0].name);
 }
 
 // Main
 const version = getVersionFromGradle();
-const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+// Use local date, not toISOString() (UTC): before 08:00 Beijing time UTC is
+// still "yesterday", which misnames the APK and mismatches the Gradle-side
+// outputFileName (which uses local time).
+const now = new Date();
+const pad2 = (n) => String(n).padStart(2, '0');
+const date = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`; // YYYY-MM-DD, local
 const dateCompact = date.replace(/-/g, ''); // YYYYMMDD
 
 const apkSrc = findApk();

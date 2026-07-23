@@ -7,9 +7,14 @@ import type { PublishResultsByRelay } from '@welshman/net'
 import { getPool, getTracker } from './engine'
 import { SocketStatus } from '@welshman/net'
 import { SocketEvent } from '@welshman/net'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('RelayManager')
 
 const DEFAULT_REQUEST_TIMEOUT = 8000
 const MAX_RETRY_COUNT = 3
+const WATCHDOG_INTERVAL_MS = 30_000
+const PROBE_TIMEOUT_MS = 6_000
 
 // ── Status Types ──────────────────────────────────────────────
 
@@ -30,6 +35,9 @@ export interface RelayManagerOptions {
 let onStatusChange: OnRelayStatusChange | undefined
 const relayStateMap = new Map<string, RelayState>()
 const trackedSocketUrls = new Set<string>()
+// URLs that have reached `connected` at least once. Resubscribe only on
+// RE-connects, not on the very first connect (the sub's REQ was just sent).
+const everConnectedUrls = new Set<string>()
 
 function createRelayState(status: RelayStatus, retryCount = 0): RelayState {
   return {
@@ -96,34 +104,70 @@ export function connectToRelays(relayUrls: readonly string[]): void {
     // Register status listener once per URL
     if (!trackedSocketUrls.has(url)) {
       trackedSocketUrls.add(url)
-      
+
       // Initialize state based on current socket status
       const initialStatus = mapSocketStatusToRelayStatus(socket.status)
       relayStateMap.set(url, createRelayState(initialStatus))
 
+      // Frame-level logging: proves whether REQs actually leave the
+      // device and whether the relay answers (EOSE/CLOSED/NOTICE).
+      // EVENT frames are logged at debug to keep history replays readable.
+      socket.on(SocketEvent.Send, (message: unknown[]) => {
+        if (message[0] === 'REQ') {
+          log.info(`frame OUT: REQ id=${message[1]}, url=${url}, filters=${JSON.stringify(message.slice(2))}`)
+        } else if (message[0] === 'CLOSE') {
+          log.info(`frame OUT: CLOSE id=${message[1]}, url=${url}`)
+        }
+      })
+      socket.on(SocketEvent.Receive, (message: unknown[]) => {
+        if (message[0] === 'EOSE') {
+          log.info(`frame IN: EOSE id=${message[1]}, url=${url}`)
+        } else if (message[0] === 'CLOSED') {
+          log.warn(`frame IN: CLOSED id=${message[1]}, reason=${message[2]}, url=${url}`)
+        } else if (message[0] === 'NOTICE') {
+          log.warn(`frame IN: NOTICE ${message[1]}, url=${url}`)
+        } else if (message[0] === 'EVENT') {
+          const ev = message[2] as { id?: string; kind?: number } | undefined
+          log.debug(`frame IN: EVENT sub=${message[1]}, id=${ev?.id?.slice(0, 8)}..., kind=${ev?.kind}, url=${url}`)
+        }
+      })
+
       socket.on(SocketEvent.Status, (status: SocketStatus) => {
         const prev = relayStateMap.get(url)
         const newStatus = mapSocketStatusToRelayStatus(status)
-        
+        log.debug(`socket ${url}: ${prev?.status ?? 'unknown'} -> ${newStatus}`)
+
         // Track retry count: Error → Opening means retry attempt
         let newRetryCount = prev?.retryCount ?? 0
         if (prev?.status === 'failed' && newStatus === 'connecting') {
           newRetryCount++
         }
-        
+
         // Reset retry count on successful connection
         if (newStatus === 'connected') {
           newRetryCount = 0
         }
-        
+
         const newState: RelayState = {
           status: newStatus,
           retryCount: newRetryCount,
           firstFailedAt: newStatus === 'failed' ? Date.now() : undefined,
         }
-        
+
         relayStateMap.set(url, newState)
         onStatusChange?.(url, computeStatus(newState), newState)
+
+        // The default socketPolicyCloseInactive also re-sends pending REQs
+        // on reconnect, but it adds `since` to the filters — which can miss
+        // NIP-59 gift wraps whose created_at is randomized into the past.
+        // Re-issuing here with the original filters avoids that.
+        if (newStatus === 'connected') {
+          if (everConnectedUrls.has(url)) {
+            resubscribeRelay(url)
+          } else {
+            everConnectedUrls.add(url)
+          }
+        }
       })
     }
 
@@ -190,6 +234,91 @@ export async function fetchEvents(
   })
 }
 
+// ── Active subscription registry ──────────────────────────────
+//
+// welshman's Socket does not re-send REQs after a reconnect, and a
+// half-dead ("zombie") TCP connection never fires close/error. To keep
+// live subscriptions alive we register every subscription here and
+// re-issue it (a) when its relay reconnects, (b) on a failed liveness
+// probe, (c) when the app returns to the foreground / network recovers.
+
+interface ActiveSub {
+  id: string
+  filters: Filter[]
+  relayUrls: string[]
+  onEvent: (event: TrustedEvent, url: string) => void
+  onEose?: (url: string) => void
+  inner: AbortController
+}
+
+const activeSubscriptions = new Map<string, ActiveSub>()
+let subSeq = 0
+
+function runRequest(sub: ActiveSub): void {
+  sub.inner.abort()
+  sub.inner = new AbortController()
+
+  const tracker = getTracker()
+  if (!tracker) throw new Error('Tracker not initialized')
+
+  log.info(`REQ issued: id=${sub.id}, relays=[${sub.relayUrls.join(', ')}], filters=${JSON.stringify(sub.filters)}`)
+
+  // The shared Tracker dedups replayed history across re-requests, so
+  // re-subscribing does not duplicate events already delivered.
+  request({
+    filters: sub.filters,
+    relays: [...sub.relayUrls],
+    tracker,
+    autoClose: false,
+    signal: sub.inner.signal,
+    onEvent: (event, url) => {
+      log.info(`event from relay: id=${event.id?.slice(0, 8)}..., kind=${event.kind}, url=${url}, sub=${sub.id}`)
+      sub.onEvent(event, url)
+    },
+    onEose: (url) => {
+      log.info(`EOSE: url=${url}, sub=${sub.id}`)
+      sub.onEose?.(url)
+    },
+    onClosed: (reason, url) => {
+      log.warn(`subscription CLOSED by relay: url=${url}, reason=${reason}, sub=${sub.id}`)
+    },
+    onDisconnect: (url) => {
+      log.warn(`socket disconnected mid-subscription: url=${url}, sub=${sub.id}`)
+    },
+    onDuplicate: (event, url) => {
+      log.debug(`event deduped by tracker: id=${event.id?.slice(0, 8)}..., url=${url}, sub=${sub.id}`)
+    },
+    onFiltered: (event, url) => {
+      log.warn(`event did not match filters: id=${event.id?.slice(0, 8)}..., kind=${event.kind}, url=${url}, sub=${sub.id}`)
+    },
+    onInvalid: (event, url) => {
+      const ev = event as TrustedEvent
+      log.warn(`event invalid: id=${ev?.id?.slice(0, 8)}..., url=${url}, sub=${sub.id}`)
+    },
+  }).catch((err) => {
+    // AbortError is expected when unsubscribing; anything else is a real
+    // failure (e.g. missing AbortSignal.any on old WebViews) and must
+    // never be silent — a swallowed error here means the REQ never
+    // reached the relay.
+    if (!sub.inner.signal.aborted) {
+      log.error(`request failed: sub=${sub.id}`, err)
+    }
+  })
+}
+
+function resubscribeRelay(url: string): void {
+  let count = 0
+  for (const sub of activeSubscriptions.values()) {
+    if (sub.relayUrls.includes(url)) {
+      runRequest(sub)
+      count++
+    }
+  }
+  if (count > 0) {
+    log.info(`reconnected ${url}, re-issued ${count} subscription(s)`)
+  }
+}
+
 /**
  * Subscribe to events matching filters (real-time, no auto-close).
  * Returns an AbortController to cancel the subscription.
@@ -201,24 +330,110 @@ export function subscribe(
   onEose?: (url: string) => void
 ): AbortController {
   connectToRelays(relayUrls)
+  startRelayWatchdog()
 
   const controller = new AbortController()
-  const tracker = getTracker()
-  if (!tracker) throw new Error('Tracker not initialized')
-
-  request({
+  const sub: ActiveSub = {
+    id: `sub-${++subSeq}`,
     filters,
-    relays: [...relayUrls],
-    tracker,
-    autoClose: false,
-    signal: controller.signal,
+    relayUrls: [...relayUrls],
     onEvent,
     onEose,
-  }).catch(() => {
-    // AbortError is expected when unsubscribing
-  })
+    inner: new AbortController(),
+  }
+  activeSubscriptions.set(sub.id, sub)
+  controller.signal.addEventListener('abort', () => {
+    activeSubscriptions.delete(sub.id)
+    sub.inner.abort()
+  }, { once: true })
+
+  runRequest(sub)
 
   return controller
+}
+
+// ── Relay watchdog (liveness probe + foreground/network recovery) ──
+
+let watchdogStarted = false
+
+/**
+ * Read-only liveness probe: a tiny REQ (limit 1) that we only need an
+ * EOSE back from. Nostr relays are not queues — reading consumes
+ * nothing. If no EOSE arrives within PROBE_TIMEOUT_MS the socket is
+ * presumed zombie (half-dead TCP never fires close/error), so we
+ * force close+open; the reconnect listener then re-issues REQs.
+ * Exported for tests.
+ */
+export function probeRelay(url: string): void {
+  const pool = getPool()
+  if (!pool) return
+  const socket = pool.get(url)
+  if (socket.status !== SocketStatus.Open) return
+
+  let alive = false
+  const timer = setTimeout(() => {
+    if (alive) return
+    log.warn(`probe timeout, treating relay as zombie: ${url}`)
+    try {
+      socket.close()
+      socket.open()
+    } catch (err) {
+      log.error(`failed to recycle zombie socket ${url}`, err)
+    }
+  }, PROBE_TIMEOUT_MS)
+
+  fetchEvents([{ kinds: [0], limit: 1 }], [url], {
+    timeout: PROBE_TIMEOUT_MS,
+    onEose: () => {
+      alive = true
+      clearTimeout(timer)
+    },
+  }).catch(() => {
+    // request() rejects on abort/timeout paths; the timer handles verdicts
+  })
+}
+
+function getActiveRelayUrls(): string[] {
+  const urls = new Set<string>()
+  for (const sub of activeSubscriptions.values()) {
+    for (const url of sub.relayUrls) urls.add(url)
+  }
+  return [...urls]
+}
+
+/** Force re-issue of every active subscription (foreground / network recovery). */
+function refreshActiveSubscriptions(reason: string): void {
+  if (activeSubscriptions.size === 0) return
+  log.info(`refreshing ${activeSubscriptions.size} subscription(s), reason: ${reason}`)
+  connectToRelays(getActiveRelayUrls())
+  for (const sub of activeSubscriptions.values()) {
+    runRequest(sub)
+  }
+}
+
+/**
+ * Start the relay watchdog. Idempotent; no-op outside the browser.
+ * Called automatically by subscribe().
+ */
+export function startRelayWatchdog(): void {
+  if (watchdogStarted || typeof window === 'undefined') return
+  watchdogStarted = true
+
+  window.setInterval(() => {
+    if (document.visibilityState !== 'visible') return
+    for (const url of getActiveRelayUrls()) {
+      probeRelay(url)
+    }
+  }, WATCHDOG_INTERVAL_MS)
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshActiveSubscriptions('foreground')
+    }
+  })
+  window.addEventListener('online', () => {
+    refreshActiveSubscriptions('online')
+  })
 }
 
 /**
@@ -242,9 +457,16 @@ export function getConnectedRelays(): string[] {
 export function closeAllRelays(): void {
   const pool = getPool()
   if (!pool) return
+  // Abort live subscriptions: their sockets are gone, and the registry
+  // would otherwise re-issue REQs against stale relay URLs.
+  for (const sub of activeSubscriptions.values()) {
+    sub.inner.abort()
+  }
+  activeSubscriptions.clear()
   pool.clear()
   trackedSocketUrls.clear()
   relayStateMap.clear()
+  everConnectedUrls.clear()
 }
 
 /**

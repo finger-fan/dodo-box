@@ -17,7 +17,17 @@ const pkgPath = path.join(root, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const version = pkg.version;
 
-console.log(`[sync-version] package.json version: ${version}`);
+// Generate a minute-resolution build stamp: year%10 + MM + DD + HH + mm
+// e.g. 2026-07-24 01:15 → "607240115". Written back to package.json so
+// next.config.ts can expose it to the app as NEXT_PUBLIC_APP_BUILD.
+const now = new Date();
+const pad = (n) => String(n).padStart(2, '0');
+const buildStamp = `${now.getFullYear() % 10}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
+
+pkg.build = buildStamp;
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+
+console.log(`[sync-version] package.json version: ${version}, build: ${buildStamp}`);
 
 // Parse version
 const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);

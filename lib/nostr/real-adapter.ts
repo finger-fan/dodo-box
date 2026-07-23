@@ -242,8 +242,16 @@ export class RealNostrAdapter implements INostrAdapter {
       filters,
       this.relayUrls,
       async (event: TrustedEvent) => {
+        log.info(`subscription raw event: id=${event.id?.slice(0, 8)}..., kind=${event.kind}, created_at=${event.created_at}`)
         const innerEvent = await decryptGiftWrap(event as SignedEvent, this.privkey)
-        if (!innerEvent || innerEvent.pubkey !== contactPubkey) return
+        if (!innerEvent) {
+          log.warn(`subscription event decrypt FAILED: id=${event.id?.slice(0, 8)}...`)
+          return
+        }
+        if (innerEvent.pubkey !== contactPubkey) {
+          log.debug(`subscription event from other sender: ${innerEvent.pubkey?.slice(0, 8)}... (chat is with ${contactPubkey.slice(0, 8)}...)`)
+          return
+        }
 
         // Parse JSON format { text: "..." } from CLI, fallback to raw content
         let messageText = innerEvent.content
@@ -256,6 +264,7 @@ export class RealNostrAdapter implements INostrAdapter {
           // Not JSON, use raw content
         }
 
+        log.info(`delivering message to UI: id=${innerEvent.id?.slice(0, 8)}..., from=${innerEvent.pubkey?.slice(0, 8)}...`)
         callback({
           id: innerEvent.id,
           text: messageText,
@@ -267,7 +276,10 @@ export class RealNostrAdapter implements INostrAdapter {
       }
     )
 
-    return () => controller.abort()
+    return () => {
+      log.info(`subscription torn down for contact ${contactPubkey.slice(0, 8)}...`)
+      controller.abort()
+    }
   }
 
   async getContacts(): Promise<NostrContact[]> {

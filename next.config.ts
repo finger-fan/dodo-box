@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
   ...(isCapacitor && { trailingSlash: true }),
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
+    NEXT_PUBLIC_APP_BUILD: packageJson.build ?? '',
   },
   transpilePackages: ['motion', 'svelte', '@welshman/store'],
   webpack: (config, {dev}) => {

@@ -53,8 +53,16 @@ export function useMessages(contactPubkey: string) {
       unsubscribe = adapter.subscribeToMessages(contactPubkey, (msg) => {
         try {
           if (mounted) {
-            log.debug(`Received new message: ${msg.id?.slice(0, 8)}...`)
-            setMessages((prev) => [...prev, msg])
+            // Dedup by id: the subscription filter has no `since`, so the relay
+            // replays history that getMessages may have already fetched.
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === msg.id)) {
+                log.debug(`Duplicate message skipped: ${msg.id?.slice(0, 8)}...`)
+                return prev
+              }
+              log.debug(`Received new message: ${msg.id?.slice(0, 8)}...`)
+              return [...prev, msg]
+            })
           }
         } catch (err) {
           log.error('subscribeToMessages callback failed', err)
