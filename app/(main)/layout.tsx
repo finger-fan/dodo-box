@@ -48,8 +48,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   // /chat 是聊天详情页(查询参数形式,避免静态导出下动态路由导致整页重载)
-  const isChatDetail = pathname === '/chat';
-  const showPathName = false;
+  // 注意这个在手机端是后面多一个 /, 在 PC 的 web 端是没有最后这个 /
+  const isChatDetail = pathname === '/chat' || pathname === '/chat/';
+  const showPathName =  false;
   const showRuler = false;
 
   return (
