@@ -136,12 +136,7 @@ export default function ContactsPage() {
                     referrerPolicy="no-referrer"
                   />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">{contact.name}</div>
-                  <div className="text-xs text-zinc-400 truncate font-mono">
-                    {contact.pubkey.slice(0, 16)}...
-                  </div>
-                </div>
+                <div className="flex-1 min-w-0 font-semibold text-zinc-900 dark:text-zinc-100 truncate">{contact.name}</div>
               </div>
             </SwipeableListItem>
           ))
