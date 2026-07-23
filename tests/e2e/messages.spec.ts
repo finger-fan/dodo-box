@@ -52,7 +52,7 @@ test.describe('Chat detail page', () => {
     const user = uniqueUser()
     await loginPage.registerAndLogin(user.username, user.password)
     await page.waitForURL(/\/messages/, { timeout: 30_000 })
-    await page.goto(`/messages/${fakePubkey}`)
+    await page.goto(`/chat?peer=${fakePubkey}`)
   })
 
   test('shows message input field', async ({ page }) => {

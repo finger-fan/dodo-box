@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNostr } from '@/contexts/NostrContext'
+import { createLogger } from '@/lib/logger'
 import type { NostrMessage } from '@/lib/nostr/types'
 import { detectGaps, insertGapIndicators, type ChatItem, type SeqGap } from '@/lib/nostr/gap-detection'
+
+const log = createLogger('useMessages')
 
 function sortMessages(a: NostrMessage, b: NostrMessage): number {
   const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
@@ -23,47 +26,73 @@ export function useMessages(contactPubkey: string) {
   const isProcessingRef = useRef(false)
 
   useEffect(() => {
+    log.debug(`useMessages effect: isAuthenticated=${session.isAuthenticated}, contactPubkey=${contactPubkey?.slice(0, 16)}...`)
     if (!session.isAuthenticated || !contactPubkey) return
 
     let mounted = true
+    let unsubscribe: (() => void) | undefined
+    try {
+      log.info(`Fetching messages for ${contactPubkey.slice(0, 16)}...`)
 
-    adapter.getMessages(contactPubkey).then((msgs) => {
-      if (!mounted) return
-      // Merge with existing messages (subscription may have already added some
-      // via the shared Tracker, so using the value form would overwrite them)
-      setMessages(prev => {
-        if (prev.length === 0) return msgs
-        const existingIds = new Set(prev.map(m => m.id))
-        const newMsgs = msgs.filter(m => !existingIds.has(m.id))
-        return newMsgs.length > 0 ? [...prev, ...newMsgs].sort(sortMessages) : prev
+      adapter.getMessages(contactPubkey).then((msgs) => {
+        if (!mounted) return
+        log.debug(`Got ${msgs?.length || 0} messages`)
+        // Merge with existing messages (subscription may have already added some
+        // via the shared Tracker, so using the value form would overwrite them)
+        setMessages(prev => {
+          if (prev.length === 0) return msgs
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMsgs = msgs.filter(m => !existingIds.has(m.id))
+          return newMsgs.length > 0 ? [...prev, ...newMsgs].sort(sortMessages) : prev
+        })
+      }).catch((err) => {
+        log.error('adapter.getMessages failed', err)
       })
-    })
 
-    const unsubscribe = adapter.subscribeToMessages(contactPubkey, (msg) => {
-      if (mounted) {
-        setMessages((prev) => [...prev, msg])
-      }
-    })
+      log.debug('Subscribing to messages...')
+      unsubscribe = adapter.subscribeToMessages(contactPubkey, (msg) => {
+        try {
+          if (mounted) {
+            log.debug(`Received new message: ${msg.id?.slice(0, 8)}...`)
+            setMessages((prev) => [...prev, msg])
+          }
+        } catch (err) {
+          log.error('subscribeToMessages callback failed', err)
+        }
+      })
+    } catch (err) {
+      log.error('useMessages effect failed', err)
+    }
 
     return () => {
+      log.debug('useMessages cleanup')
       mounted = false
-      unsubscribe()
+      try {
+        unsubscribe?.()
+      } catch (err) {
+        log.error('useMessages unsubscribe failed', err)
+      }
     }
   }, [adapter, contactPubkey, session.isAuthenticated])
 
   const chatItems = useMemo((): ChatItem[] => {
-    const gaps = detectGaps(messages)
-    const items = insertGapIndicators(messages, gaps)
-    // Apply recovering/unrecoverable status
-    return items.map((item) => {
-      if ('type' in item && (item as { type: string }).type === 'gap') {
-        const gapItem = item as ChatItem & { type: 'gap'; id: string }
-        if (recoveringGaps.has(gapItem.id)) {
-          return { ...gapItem, status: 'recovering' as const }
+    try {
+      const gaps = detectGaps(messages)
+      const items = insertGapIndicators(messages, gaps)
+      // Apply recovering/unrecoverable status
+      return items.map((item) => {
+        if ('type' in item && (item as { type: string }).type === 'gap') {
+          const gapItem = item as ChatItem & { type: 'gap'; id: string }
+          if (recoveringGaps.has(gapItem.id)) {
+            return { ...gapItem, status: 'recovering' as const }
+          }
         }
-      }
-      return item
-    })
+        return item
+      })
+    } catch (err) {
+      log.error('chatItems computation failed (detectGaps/insertGapIndicators)', err)
+      return []
+    }
   }, [messages, recoveringGaps])
 
   const recoverGap = useCallback(async (gap: SeqGap) => {
@@ -86,7 +115,7 @@ export function useMessages(contactPubkey: string) {
         })
       }
     } catch (error) {
-      console.error('[useMessages] recoverGap failed:', error)
+      log.error('recoverGap failed', error)
     }
 
     setRecoveringGaps(prev => {

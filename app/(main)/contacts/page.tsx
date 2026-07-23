@@ -30,7 +30,7 @@ export default function ContactsPage() {
   );
 
   const handleContactClick = (pubkey: string) => {
-    router.push(`/messages/${pubkey}`);
+    router.push(`/chat?peer=${pubkey}`);
   };
 
   const handleDelete = async (pubkey: string) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, act, waitFor } from '@testing-library/react'
+import { render, act } from '@testing-library/react'
 import React from 'react'
 import { NostrProvider, useNostr } from '@/contexts/NostrContext'
 import type { VaultData } from '@/lib/nostr/types'
@@ -81,7 +81,7 @@ describe('NostrProvider - initial state', () => {
     expect(ctx.session.currentPubkey).toBeNull()
   })
 
-  it('auto-logouts when session is restored but privkeys are lost', async () => {
+  it('restores session in locked state when privkeys are lost (no auto-logout)', async () => {
     localStorage.setItem('dodobox_session', JSON.stringify({
       isAuthenticated: true,
       username: 'alice',
@@ -91,12 +91,11 @@ describe('NostrProvider - initial state', () => {
 
     const { captured } = renderWithProvider()
 
-    // After useEffect fires, session should be cleared because privkeys are lost
-    await waitFor(() => {
-      const ctx = captured[captured.length - 1]
-      expect(ctx.session.isAuthenticated).toBe(false)
-    })
-    expect(localStorage.getItem('dodobox_session')).toBeNull()
+    // Session is kept but marked locked — the user unlocks with their password
+    const ctx = captured[captured.length - 1]
+    expect(ctx.session.isAuthenticated).toBe(true)
+    expect(ctx.session.locked).toBe(true)
+    expect(localStorage.getItem('dodobox_session')).not.toBeNull()
   })
 })
 
@@ -174,6 +173,55 @@ describe('register', () => {
 
     expect(result!.success).toBe(false)
     expect(!result!.success && result!.error).toContain('already exists')
+  })
+})
+
+describe('unlock', () => {
+  beforeEach(() => {
+    vi.mocked(vaultSync.fetchVault).mockResolvedValue(MOCK_VAULT)
+  })
+
+  // Simulates a page reload: first provider logs in (persisting the session),
+  // then unmounts; a fresh provider restores the session without privkey refs.
+  async function renderLockedSession(username: string, password: string) {
+    const first = renderWithProvider()
+    await act(async () => {
+      await first.captured[first.captured.length - 1].login(username, password)
+    })
+    first.result.unmount()
+
+    const second = renderWithProvider()
+    const ctx = second.captured[second.captured.length - 1]
+    expect(ctx.session.isAuthenticated).toBe(true)
+    expect(ctx.session.locked).toBe(true)
+    return second
+  }
+
+  it('unlocks with the correct password and restores vault data', async () => {
+    const { captured } = await renderLockedSession('alice', 'password123')
+
+    let result: Awaited<ReturnType<ReturnType<typeof useNostr>['unlock']>> | undefined
+    await act(async () => {
+      result = await captured[captured.length - 1].unlock('password123')
+    })
+
+    expect(result!.success).toBe(true)
+    const ctx = captured[captured.length - 1]
+    expect(ctx.session.locked).toBe(false)
+    expect(ctx.session.vaultData).not.toBeNull()
+  })
+
+  it('rejects a wrong password and stays locked', async () => {
+    const { captured } = await renderLockedSession('alice', 'password123')
+
+    let result: Awaited<ReturnType<ReturnType<typeof useNostr>['unlock']>> | undefined
+    await act(async () => {
+      result = await captured[captured.length - 1].unlock('wrongpass')
+    })
+
+    expect(result!.success).toBe(false)
+    expect(!result!.success && result!.error).toBe('Wrong password')
+    expect(captured[captured.length - 1].session.locked).toBe(true)
   })
 })
 

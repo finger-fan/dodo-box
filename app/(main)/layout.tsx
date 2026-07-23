@@ -4,8 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import IdentityOnboarding from '@/components/settings/IdentityOnboarding';
+import UnlockScreen from '@/components/auth/UnlockScreen';
 import { cn } from '@/lib/utils';
 import { useNostr } from '@/contexts/NostrContext';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('MainLayout');
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -15,6 +19,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (!session.isAuthenticated) {
+      log.debug('nav to login');
       router.push('/login');
     } else {
       requestAnimationFrame(() => {
@@ -24,6 +29,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, [router, session.isAuthenticated]);
 
   if (!isReady) return null;
+
+  // 页面重载后私钥丢失,会话处于锁定状态——显示解锁屏而非踢回登录页
+  if (session.locked) {
+    return <UnlockScreen />;
+  }
 
   const hasActiveIdentity = (session.vaultData?.identities ?? []).some(
     (i) => i.pubkey === session.currentPubkey
@@ -37,11 +47,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return <IdentityOnboarding />;
   }
 
-  // 解析 pathname: /messages 或 /messages/ 是列表页，/messages/xxx 是聊天详情页
-  const pathParts = pathname.split('/').filter(Boolean);
-  const isChatDetail = pathParts[0] === 'messages' && pathParts.length > 1 && pathParts[1] !== '';
+  // /chat 是聊天详情页(查询参数形式,避免静态导出下动态路由导致整页重载)
+  const isChatDetail = pathname === '/chat';
   const showPathName = false;
-  const showRuler = true;
+  const showRuler = false;
 
   return (
     <div className={cn("min-h-screen bg-zinc-50 dark:bg-zinc-950", !isChatDetail && "pb-20")}>

@@ -140,6 +140,11 @@
   },
   "auth": {
     "refresh_logout": "For your security, you've been logged out after refreshing",
+    "unlock_title": "Session Locked",
+    "unlock_desc": "Signed in as {{username}}. The page was reloaded, enter your password to unlock.",
+    "unlock": "Unlock",
+    "unlock_wrong_password": "Wrong password",
+    "unlock_switch_account": "Log out and switch account",
     "tagline": "Decentralized Account Management",
     "manager_title": "Account Management",
     "login_method": "Login to Account",

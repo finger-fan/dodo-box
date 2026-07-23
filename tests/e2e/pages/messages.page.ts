@@ -41,7 +41,7 @@ export class MessagesPage {
     await targetEl.locator('..').locator('..').click({ force: true })
 
     // Wait for navigation to chat page (client-side)
-    await this.page.waitForURL(/\/messages\//, { timeout: 15_000, waitUntil: 'commit' })
+    await this.page.waitForURL(/\/chat\?peer=/, { timeout: 15_000, waitUntil: 'commit' })
 
     // Wait for the chat view to load
     await this.page.locator('[data-testid="message-input"]').waitFor({

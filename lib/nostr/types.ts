@@ -74,6 +74,11 @@ export interface NostrSession {
   username: string | null
   currentPubkey: string | null
   vaultData: VaultData | null
+  /**
+   * true 表示会话从 localStorage 恢复但私钥(仅内存)已丢失,
+   * 需要用户输入密码解锁后才能使用。未设置等同于 false。
+   */
+  locked?: boolean
 }
 
 export type NostrResult<T = void> =

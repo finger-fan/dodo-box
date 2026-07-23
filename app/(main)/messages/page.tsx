@@ -6,12 +6,35 @@ import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useChats } from '@/hooks/nostr/use-chats';
 import { useMounted } from '@/hooks/use-mounted';
+import { createLogger } from '@/lib/logger';
+import { useEffect } from 'react';
+
+const log = createLogger('MessagesPage');
 
 export default function MessagesPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { chats, isLoading } = useChats();
   const mounted = useMounted();
+
+  useEffect(() => {
+    log.info('MessagesPage mounted');
+    // 诊断埋点(临时):客户端路由跳转不会触发 pagehide/beforeunload,
+    // 点击聊天项后若这两个事件触发,即可确认发生了整页硬跳转
+    const onPageHide = (e: PageTransitionEvent) => {
+      log.warn(`pagehide fired: persisted=${e.persisted}, path=${window.location.pathname}`);
+    };
+    const onBeforeUnload = () => {
+      log.warn(`beforeunload fired, path=${window.location.pathname}`);
+    };
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      log.debug('MessagesPage unmounted');
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, []);
 
   if (!mounted) return null;
 
@@ -44,7 +67,15 @@ export default function MessagesPage() {
             <button
               key={chat.pubkey}
               data-testid="chat-item"
-              onClick={() => router.push(`/messages/${chat.pubkey}`)}
+              onClick={() => {
+                log.info(`chat item clicked: ${chat.pubkey.slice(0, 16)}..., calling router.push`);
+                try {
+                  router.push(`/chat?peer=${chat.pubkey}`);
+                  log.debug('router.push returned (client-side nav initiated)');
+                } catch (err) {
+                  log.error('router.push threw', err);
+                }
+              }}
               className="w-full flex items-center gap-4 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border-b border-zinc-50 dark:border-zinc-900"
             >
               <div className="relative">

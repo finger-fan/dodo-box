@@ -96,6 +96,7 @@ function makeWrapper(adapter: INostrAdapter, session: NostrSession = TEST_SESSIO
           adapter,
           login: vi.fn(),
           register: vi.fn(),
+          unlock: vi.fn(),
           logout: vi.fn(),
           switchIdentity: vi.fn(),
           createIdentity: vi.fn(),

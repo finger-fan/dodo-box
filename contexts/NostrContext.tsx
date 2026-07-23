@@ -22,6 +22,7 @@ import { vaultSync } from '@/lib/nostr/vault-sync'
 import { getConnectedRelays } from '@/lib/welshman/relay-manager'
 import { createNostrAdapter, getAdapterMode, setAdapterMode, type AdapterMode } from '@/lib/nostr'
 import { getRuntimeConfig, getDefaultRelays, getUserRelays } from '@/lib/runtime-config'
+import { createLogger } from '@/lib/logger'
 import type {
   NostrSession,
   VaultData,
@@ -29,6 +30,8 @@ import type {
   INostrAdapter,
   NostrResult,
 } from '@/lib/nostr/types'
+
+const log = createLogger('NostrContext')
 
 const SESSION_STORAGE_KEY = 'dodobox_session'
 
@@ -38,6 +41,7 @@ interface NostrContextValue {
   adapterMode: AdapterMode
   login(username: string, password: string): Promise<NostrResult<NostrSession>>
   register(username: string, password: string): Promise<NostrResult<NostrSession>>
+  unlock(password: string): Promise<NostrResult>
   logout(): void
   switchIdentity(pubkey: string): Promise<NostrResult>
   createIdentity(name: string, slogan?: string): Promise<NostrResult<VaultIdentity>>
@@ -76,9 +80,16 @@ function loadPersistedSession(): PersistedSession {
   }
   try {
     const raw = localStorage.getItem(SESSION_STORAGE_KEY)
-    if (!raw) return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
-    return JSON.parse(raw) as PersistedSession
-  } catch {
+    if (!raw) {
+      log.debug('No session found in localStorage')
+      return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
+    }
+    log.debug(`Raw session from localStorage: ${raw.slice(0, 100)}...`)
+    const parsed = JSON.parse(raw) as PersistedSession
+    log.debug(`Parsed session: isAuthenticated=${parsed.isAuthenticated}, username=${parsed.username}, hasPubkey=${!!parsed.currentPubkey}`)
+    return parsed
+  } catch (err) {
+    log.error('Failed to parse session from localStorage', err)
     return { ...EMPTY_SESSION, vaultData: null, masterPubkey: undefined }
   }
 }
@@ -93,6 +104,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('dodobox_account_active', 'true')
         localStorage.setItem('dodobox_current_user', 'mock-user')
       }
+      log.info('Initialized with mock-telegram mode')
       return {
         isAuthenticated: true,
         username: 'mock-user',
@@ -103,15 +115,19 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
     const persisted = loadPersistedSession()
     if (persisted.isAuthenticated && persisted.currentPubkey) {
-      // Note: On page refresh, private keys will be lost (memory-only refs).
-      // The useEffect below handles auto-logout for this case.
+      // Private keys live only in memory refs and are lost on page reload.
+      // Instead of logging out, restore the session in locked state and let
+      // the user unlock it with their password (see unlock()).
+      log.info(`Restored session from localStorage (locked): username=${persisted.username}, pubkey=${persisted.currentPubkey?.slice(0, 16)}...`)
       return {
         isAuthenticated: persisted.isAuthenticated,
         username: persisted.username,
         currentPubkey: persisted.currentPubkey,
         vaultData: null,
+        locked: true,
       }
     }
+    log.debug('No persisted session found, starting with empty session')
     return EMPTY_SESSION
   })
   // Private key lives ONLY in memory ref, never in React state
@@ -144,7 +160,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         return config.relays
       })
       .catch(err => {
-        console.warn('[NostrContext] Failed to load runtime config, using defaults:', err)
+        log.warn(`Failed to load runtime config, using defaults: ${err}`)
         const defaults = getDefaultRelays()
         runtimeRelaysRef.current = defaults
         vaultSync.setRelayUrls(defaults)
@@ -152,23 +168,17 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       })
   }, [])
 
-  // Auto-logout on page refresh when privkey is lost (session persisted but key in memory is gone)
+  // Auto-lock when privkey is lost (session persisted but key in memory is gone).
+  // We no longer log out here — the (main) layout shows an unlock screen instead.
   useEffect(() => {
-    if (!session.isAuthenticated) return
+    if (!session.isAuthenticated || session.locked) return
     if (identityPrivkeyRef.current || masterPrivkeyRef.current) return
-    // Session was restored from localStorage but private keys are lost — defer state updates
+    log.warn('Session authenticated but private keys lost — locking session')
+    log.debug(`identityPrivkeyRef=${!!identityPrivkeyRef.current}, masterPrivkeyRef=${!!masterPrivkeyRef.current}`)
     queueMicrotask(() => {
-      masterPrivkeyRef.current = null
-      masterPubkeyRef.current = null
-      identityPrivkeyRef.current = null
-     setSession(EMPTY_SESSION)
-     if (typeof window !== 'undefined') {
-        localStorage.setItem('dodobox_refresh_logout', 'true')
-        localStorage.removeItem(SESSION_STORAGE_KEY)
-        localStorage.removeItem('dodobox_account_active')
-        localStorage.removeItem('dodobox_current_user')
-      }
-      setAdapter(createNostrAdapter())
+      setSession(prev =>
+        prev.isAuthenticated && !prev.locked ? { ...prev, locked: true } : prev
+      )
     })
   }, [session])
 
@@ -186,7 +196,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         })
       )
     } catch (err) {
-      console.warn('[NostrContext] Failed to persist session to localStorage:', err)
+      log.warn(`Failed to persist session to localStorage: ${err}`)
     }
   }
 
@@ -276,6 +286,81 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       return { success: false, error: String(error) }
     }
   }, [])
+
+  // Re-derive keys from the password after a page reload wiped the
+  // memory-only privkey refs. Verifies against the persisted masterPubkey
+  // so a wrong password fails fast without touching the relays.
+  const unlock = useCallback(async (password: string): Promise<NostrResult> => {
+    if (!session.isAuthenticated || !session.username) {
+      return { success: false, error: 'No session to unlock' }
+    }
+    try {
+      const masterKey = deriveMasterKey(session.username, password)
+
+      const persisted = loadPersistedSession()
+      if (persisted.masterPubkey && masterKey.publicKey !== persisted.masterPubkey) {
+        return { success: false, error: 'Wrong password' }
+      }
+
+      masterPrivkeyRef.current = masterKey.privateKey
+      masterPubkeyRef.current = masterKey.publicKey
+
+      const relays = await ensureRelays()
+      const vaultData = await vaultSync.fetchVault(
+        masterKey.publicKey,
+        masterKey.privateKey
+      )
+
+      if (!vaultData) {
+        masterPrivkeyRef.current = null
+        masterPubkeyRef.current = null
+        const connected = getConnectedRelays().length
+        const error = connected === 0
+          ? 'No relay connection. Check your network and try again.'
+          : 'Account not found'
+        return { success: false, error }
+      }
+
+      // Restore the previously active identity, falling back to the first one
+      let currentPubkey = masterKey.publicKey
+      let currentPrivkey = masterKey.privateKey
+      const activeIdentity =
+        vaultData.identities.find(i => i.pubkey === session.currentPubkey) ??
+        vaultData.identities[0]
+
+      if (activeIdentity) {
+        try {
+          currentPrivkey = await decryptSecret(
+            masterKey.privateKey,
+            activeIdentity.encryptedSecret
+          )
+          currentPubkey = activeIdentity.pubkey
+        } catch {
+          // fallback to master key
+        }
+      }
+
+      identityPrivkeyRef.current = currentPrivkey
+
+      const newSession: NostrSession = {
+        isAuthenticated: true,
+        username: session.username,
+        currentPubkey,
+        vaultData,
+        locked: false,
+      }
+
+      setSession(newSession)
+      persistSession({ ...newSession, masterPubkey: masterKey.publicKey })
+      setAdapter(buildAdapterForSession(newSession, currentPrivkey, relays))
+
+      return { success: true, data: undefined }
+    } catch (error) {
+      masterPrivkeyRef.current = null
+      masterPubkeyRef.current = null
+      return { success: false, error: String(error) }
+    }
+  }, [session])
 
   const register = useCallback(async (
     username: string,
@@ -527,6 +612,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
         adapterMode: currentAdapterMode,
         login,
         register,
+        unlock,
         logout,
         switchIdentity,
         createIdentity,

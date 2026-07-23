@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, use, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMounted } from '@/hooks/use-mounted';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn, defaultAvatar, shortPubkey } from '@/lib/utils';
@@ -13,6 +13,14 @@ import type { DeliveryStatus } from '@/lib/nostr/types';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMaskSettings } from '@/hooks/use-mask-settings';
 import MaskedText from '@/components/chat/MaskedText';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ChatView');
+
+// 诊断埋点(临时):模块加载即记录,证明 JS chunk 已被加载执行
+if (typeof window !== 'undefined') {
+  log.info(`ChatView module evaluated, path=${window.location.pathname}`);
+}
 
 function PendingDot() {
   return (
@@ -44,11 +52,12 @@ function SendStatusIcon({ status, onRetry }: { status?: DeliveryStatus; onRetry?
   );
 }
 
-export default function ChatView({ params }: { params: Promise<{ id: string }> }) {
+export default function ChatView() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { id } = use(params);
-  const { adapter } = useNostr();
+  const searchParams = useSearchParams();
+  const id = searchParams.get('peer') ?? '';
+  const { adapter, session } = useNostr();
   const { chatItems, sendMessage, isSending, recoverGap, retrySend } = useMessages(id);
   const { seconds: maskSeconds, chars: maskChars } = useMaskSettings();
   const [msgInput, setMsgInput] = useState('');
@@ -58,27 +67,90 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 缺少 peer 参数时退回聊天列表
+  useEffect(() => {
+    if (!id) {
+      log.warn('no peer param, redirecting to /messages');
+      router.replace('/messages');
+    }
+  }, [id, router]);
+
+  // 诊断埋点(临时):记录每次渲染,证明组件已进入 React 渲染流程
+  log.debug(`ChatView render: id=${id?.slice(0, 16)}..., mounted=${mounted}, isAuthenticated=${session.isAuthenticated}, chatItems=${chatItems?.length ?? 0}`);
+
+  // 诊断埋点(临时):捕获整页卸载信号。客户端路由跳转不会触发
+  // pagehide/beforeunload,只有整页重载/硬跳转才会——这是区分
+  // "ChatView 内崩溃" 与 "路由阶段硬跳转" 的关键证据
+  useEffect(() => {
+    const onPageHide = (e: PageTransitionEvent) => {
+      log.warn(`pagehide fired: persisted=${e.persisted}, path=${window.location.pathname}`);
+    };
+    const onBeforeUnload = () => {
+      log.warn(`beforeunload fired, path=${window.location.pathname}`);
+    };
+    const onVisibilityChange = () => {
+      log.debug(`visibilitychange: ${document.visibilityState}`);
+    };
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  // Lifecycle logging
+  useEffect(() => {
+    try {
+      log.info(`ChatView mounted with id=${id?.slice(0, 16)}..., isAuthenticated=${session.isAuthenticated}`);
+      log.debug(`chatItems count: ${chatItems?.length || 0}, isSending: ${isSending}`);
+    } catch (err) {
+      log.error('ChatView mount effect failed', err);
+    }
+    return () => log.debug('ChatView unmounted');
+  }, [id, session.isAuthenticated]);
+
+  // Log when chatItems changes
+  useEffect(() => {
+    if (chatItems && chatItems.length > 0) {
+      log.debug(`chatItems updated: ${chatItems.length} items, first: ${chatItems[0]?.id?.slice(0, 8)}...`);
+    }
+  }, [chatItems]);
+
   // Load contact display name: petname from contacts first, then kind:0 profile, then short pubkey
   useEffect(() => {
     if (!id) return;
+    log.debug(`loading profile for ${id.slice(0, 16)}..., adapter exists: ${!!adapter}`);
     let cancelled = false;
     (async () => {
-      const contacts = await adapter.getContacts();
-      if (cancelled) return;
-      const contact = contacts.find((c) => c.pubkey === id);
-      if (contact) {
-        setChatName(contact.name || shortPubkey(id));
-        setChatAvatar(contact.avatar || defaultAvatar(id));
-        return;
-      }
-      const profile = await adapter.getProfile(id);
-      if (cancelled) return;
-      if (profile) {
-        setChatName(profile.displayName || profile.name || shortPubkey(id));
-        setChatAvatar(profile.picture || defaultAvatar(id));
-      } else {
-        setChatName(shortPubkey(id));
-        setChatAvatar(defaultAvatar(id));
+      try {
+        log.debug('fetching contacts...');
+        const contacts = await adapter.getContacts();
+        if (cancelled) return;
+        log.debug(`got ${contacts?.length || 0} contacts`);
+        const contact = contacts.find((c) => c.pubkey === id);
+        if (contact) {
+          log.debug(`found contact: ${contact.name}`);
+          setChatName(contact.name || shortPubkey(id));
+          setChatAvatar(contact.avatar || defaultAvatar(id));
+          return;
+        }
+        log.debug('contact not found, fetching profile...');
+        const profile = await adapter.getProfile(id);
+        if (cancelled) return;
+        if (profile) {
+          log.debug(`got profile: ${profile.displayName || profile.name}`);
+          setChatName(profile.displayName || profile.name || shortPubkey(id));
+          setChatAvatar(profile.picture || defaultAvatar(id));
+        } else {
+          log.debug('profile not found, using short pubkey');
+          setChatName(shortPubkey(id));
+          setChatAvatar(defaultAvatar(id));
+        }
+      } catch (err) {
+        log.error('Failed to load contact/profile', err);
       }
     })();
     return () => { cancelled = true; };
@@ -86,7 +158,11 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    try {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      log.error('scrollIntoView failed', err);
+    }
   }, [chatItems]);
 
   const adjustTextareaHeight = useCallback(() => {
@@ -103,7 +179,11 @@ export default function ChatView({ params }: { params: Promise<{ id: string }> }
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    await sendMessage(text);
+    try {
+      await sendMessage(text);
+    } catch (err) {
+      log.error('handleSend failed', err);
+    }
   };
 
   if (!mounted) return null;
