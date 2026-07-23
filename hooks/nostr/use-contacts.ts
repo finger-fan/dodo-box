@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNostr } from '@/contexts/NostrContext'
+import { createLogger } from '@/lib/logger'
 import type { NostrContact, NostrResult } from '@/lib/nostr/types'
+
+const log = createLogger('useContacts')
 
 export function useContacts() {
   const { adapter, session } = useNostr()
@@ -17,7 +20,7 @@ export function useContacts() {
         setContacts(result)
       }
     }).catch((err) => {
-      console.warn('[useContacts] Failed to fetch contacts:', err)
+      log.warn(`Failed to fetch contacts: ${err}`)
     }).finally(() => {
       if (!cancelled) {
         setIsLoading(false)

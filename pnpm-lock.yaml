@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@aparajita/capacitor-logger':
+        specifier: ^5.0.0
+        version: 5.0.0(tslib@2.8.1)
       '@capacitor/clipboard':
         specifier: ^8.0.1
         version: 8.0.1(@capacitor/core@8.2.0)
@@ -173,6 +176,12 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
+  '@aparajita/capacitor-logger@5.0.0':
+    resolution: {integrity: sha512-UxlZ8VBgXDt/ER03CB5d7Sk71Pql0ffqkUq8iVUdHYYEuQc/akSRKjaSR5z30pe0PyWec9lsXvOgH+M4ARUgow==}
+    engines: {node: '>=16.15.1'}
+    peerDependencies:
+      tslib: ^2.6.2
+
   '@apidevtools/json-schema-ref-parser@9.1.2':
     resolution: {integrity: sha512-r1w81DpR+KyRWd3f+rk6TNqMgedmAxZP5v5KWlXQWlgMUUtyEJch0DKEci1SorPMiSeM8XPl7MZ3miJ60JIpQg==}
 
@@ -276,6 +285,11 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
+  '@capacitor/android@6.0.0':
+    resolution: {integrity: sha512-NwL87VO9F1WY/EgvJZN9pIhjejq688k2fRW6XWNLVe3cgGE6nUb9J34KI68fhx3139cf2LVGPUYs+mwZC8esiQ==}
+    peerDependencies:
+      '@capacitor/core': ^6.0.0
+
   '@capacitor/android@8.2.0':
     resolution: {integrity: sha512-XLm5OsWLPfXQxDxzFS7SOdMEgGvW+2c7TGLXkTR2cSKdkWK5Abns4imlT5qghKYhjM9r74IrDkBWg/9ALUGNKQ==}
     peerDependencies:
@@ -291,8 +305,16 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
+  '@capacitor/core@6.0.0':
+    resolution: {integrity: sha512-NvxIQsJcMiIV+Le1DilR2GGyQQbDInfXK1UywGROQ5mycdFlW5XoAPZ+MKnFGB123RoEgE3uhDGgwTXUmSlX9A==}
+
   '@capacitor/core@8.2.0':
     resolution: {integrity: sha512-oKaoNeNtH2iIZMDFVrb1atoyRECDGHcfLMunJ5KWN8DtvpVBeeA4c41e20NTuhMxw1cSYbpq2PV2hb+/9CJxlQ==}
+
+  '@capacitor/ios@6.0.0':
+    resolution: {integrity: sha512-7mAs3gjWiE5DPM4AGPduqFSDGXCPwwqQRMzbohVway7/cTWnHomHV8mIojMZE4GILeWO2fILbyu3C8q9pHg2vg==}
+    peerDependencies:
+      '@capacitor/core': ^6.0.0
 
   '@capacitor/privacy-screen@2.0.1':
     resolution: {integrity: sha512-NDKXhf2tGMZu6JcVTDtwfUw0Y7BMBfcoinhxVqRhzHaBCO7HgXF7MRX2HLk0T+l4/2uzmRb3AvUKHiF4BW8drA==}
@@ -6065,6 +6087,13 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
+  '@aparajita/capacitor-logger@5.0.0(tslib@2.8.1)':
+    dependencies:
+      '@capacitor/android': 6.0.0(@capacitor/core@6.0.0)
+      '@capacitor/core': 6.0.0
+      '@capacitor/ios': 6.0.0(@capacitor/core@6.0.0)
+      tslib: 2.8.1
+
   '@apidevtools/json-schema-ref-parser@9.1.2':
     dependencies:
       '@jsdevtools/ono': 7.1.3
@@ -6216,6 +6245,10 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
+  '@capacitor/android@6.0.0(@capacitor/core@6.0.0)':
+    dependencies:
+      '@capacitor/core': 6.0.0
+
   '@capacitor/android@8.2.0(@capacitor/core@8.2.0)':
     dependencies:
       '@capacitor/core': 8.2.0
@@ -6246,9 +6279,17 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.2.0
 
+  '@capacitor/core@6.0.0':
+    dependencies:
+      tslib: 2.8.1
+
   '@capacitor/core@8.2.0':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/ios@6.0.0(@capacitor/core@6.0.0)':
+    dependencies:
+      '@capacitor/core': 6.0.0
 
   '@capacitor/privacy-screen@2.0.1(@capacitor/core@8.2.0)':
     dependencies:

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { createLogger } from '@/lib/logger'
 
 export default function ErrorView({
   error,
@@ -17,7 +18,8 @@ export default function ErrorView({
   const { t } = useTranslation()
 
   useEffect(() => {
-    console.error(`[${label}]`, error)
+    const log = createLogger(label)
+    log.error('Error caught', error)
   }, [error, label])
 
   return (

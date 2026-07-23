@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { createLogger } from '@/lib/logger';
 import {
   notifyAppReady,
   checkForUpdate,
@@ -9,6 +10,8 @@ import {
   resetToBuiltin,
   type UpdateManifest,
 } from '@/lib/updater';
+
+const log = createLogger('Updater');
 
 export interface UseUpdaterReturn {
   checking: boolean;
@@ -33,7 +36,7 @@ export function useUpdater(): UseUpdaterReturn {
     if (!Capacitor.isNativePlatform()) return;
     notifyAppReady()
       .catch((err) => {
-        console.warn('[Updater] notifyAppReady failed:', err);
+        log.warn(`notifyAppReady failed: ${err}`);
       })
       .then(() => {
         if (process.env.NEXT_PUBLIC_UPDATE_URL) check();

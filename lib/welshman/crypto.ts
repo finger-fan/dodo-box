@@ -5,6 +5,9 @@ import { Nip59, Nip01Signer } from '@welshman/signer'
 import { makeEvent, type SignedEvent, type HashedEvent, type StampedEvent } from '@welshman/util'
 import { DIRECT_MESSAGE, WRAP, PROFILE, FOLLOWS, HANDLER_INFORMATION } from '@welshman/util'
 import { getPubkey, sign as signRaw, prep } from '@welshman/util'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('welshman/crypto')
 
 /**
  * Create a Nip01Signer from a hex private key.
@@ -106,7 +109,7 @@ export async function decryptGiftWrap(
     const nip59 = createNip59(recipientPrivkeyHex)
     return await nip59.unwrap(wrapEvent)
   } catch (error) {
-    console.error('[welshman/crypto] decryptGiftWrap failed:', error)
+    log.error('decryptGiftWrap failed', error)
     return null
   }
 }

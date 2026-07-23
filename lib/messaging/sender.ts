@@ -3,7 +3,10 @@
 
 import { buildDirectMessageEvent, createGiftWrap } from '@/lib/welshman/crypto'
 import { publishEvent, connectToRelays } from '@/lib/welshman/relay-manager'
+import { createLogger } from '@/lib/logger'
 import type { SignedEvent } from '@welshman/util'
+
+const log = createLogger('sender')
 
 let seqCounter = 0
 
@@ -72,7 +75,7 @@ export async function sendDirectMessage(
       error: successCount === 0 ? 'Failed to publish to any relay' : undefined,
     }
   } catch (error) {
-    console.error('[sender] Failed to send message:', error)
+    log.error('Failed to send message', error)
     return {
       eventId: '',
       success: false,

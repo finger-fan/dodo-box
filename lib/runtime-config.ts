@@ -2,6 +2,10 @@
 // Fetches server-side environment variables (like relay URLs) at runtime
 // so that NEXT_PUBLIC_* build-time inlining is not required for deployment.
 
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('RuntimeConfig')
+
 export interface RuntimeConfig {
   relays: string[]
 }
@@ -10,11 +14,26 @@ const DEFAULT_RELAYS = 'wss://relay.damus.io'
 const USER_RELAYS_KEY = 'dodobox_user_relays'
 
 export async function getRuntimeConfig(): Promise<RuntimeConfig> {
-  const res = await fetch('/api/config')
-  if (!res.ok) {
-    throw new Error(`Failed to load runtime config: ${res.status}`)
+  const url = '/api/config'
+  log.debug(`Fetching runtime config from: ${url}, base URL: ${typeof window !== 'undefined' ? window.location.origin : 'unknown'}`)
+  
+  try {
+    const res = await fetch(url)
+    log.debug(`Response status: ${res.status}, content-type: ${res.headers.get('content-type')}`)
+    
+    if (!res.ok) {
+      const text = await res.text().catch(() => 'unable to read response')
+      log.error(`API returned ${res.status}: ${text.slice(0, 100)}`)
+      throw new Error(`Failed to load runtime config: ${res.status}`)
+    }
+    
+    const data = await res.json()
+    log.debug(`Got config with ${data.relays?.length || 0} relays`)
+    return data
+  } catch (err) {
+    log.error('Failed to fetch runtime config', err)
+    throw err
   }
-  return res.json()
 }
 
 export function getDefaultRelays(): string[] {

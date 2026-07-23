@@ -4,7 +4,10 @@
 
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils'
 import { VAULT_ERROR_CODES, VaultError } from './types'
+import { createLogger } from '@/lib/logger'
 import type { VaultData, VaultIdentity } from './types'
+
+const log = createLogger('VaultCrypto')
 
 const IV_LENGTH = 12
 const PBKDF2_ITERATIONS = 100000
@@ -63,7 +66,7 @@ export async function encryptVault(
 
     return `${bytesToHex(iv)}:${bytesToHex(new Uint8Array(ciphertext))}`
   } catch (error) {
-    console.error('[VaultCrypto] encryptVault failed:', error)
+    log.error('encryptVault failed', error)
     throw new VaultError('Failed to encrypt vault', VAULT_ERROR_CODES.ENCRYPTION_FAILED)
   }
 }
@@ -98,7 +101,7 @@ export async function decryptVault(
 
     return data as VaultData
   } catch (error) {
-    console.error('[VaultCrypto] decryptVault failed:', error)
+    log.error('decryptVault failed', error)
     throw new VaultError('Failed to decrypt vault', VAULT_ERROR_CODES.DECRYPTION_FAILED)
   }
 }
@@ -120,7 +123,7 @@ export async function encryptSecret(
 
     return `${bytesToHex(iv)}:${bytesToHex(new Uint8Array(ciphertext))}`
   } catch (error) {
-    console.error('[VaultCrypto] encryptSecret failed:', error)
+    log.error('encryptSecret failed', error)
     throw new VaultError('Failed to encrypt secret', VAULT_ERROR_CODES.ENCRYPTION_FAILED)
   }
 }
@@ -148,7 +151,7 @@ export async function decryptSecret(
 
     return new TextDecoder().decode(decrypted)
   } catch (error) {
-    console.error('[VaultCrypto] decryptSecret failed:', error)
+    log.error('decryptSecret failed', error)
     throw new VaultError('Failed to decrypt secret', VAULT_ERROR_CODES.DECRYPTION_FAILED)
   }
 }

@@ -80,6 +80,7 @@ function makeWrapper(adapter: INostrAdapter, session: NostrSession = TEST_SESSIO
           adapter,
           login: vi.fn(),
           register: vi.fn(),
+          unlock: vi.fn(),
           logout: vi.fn(),
           switchIdentity: vi.fn(),
           createIdentity: vi.fn(),
@@ -144,8 +145,7 @@ describe('useContacts', () => {
 
     expect(result.current.contacts).toEqual([])
     expect(warnSpy).toHaveBeenCalledWith(
-      '[useContacts] Failed to fetch contacts:',
-      expect.any(Error)
+      expect.stringContaining('[useContacts] Failed to fetch contacts:')
     )
 
     warnSpy.mockRestore()

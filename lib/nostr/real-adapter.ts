@@ -14,6 +14,9 @@ import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { defaultAvatar, shortPubkey } from '@/lib/utils'
 import { incrementSeqCounter, parseSeqTag, recoverSeqCounter } from './seq-counter'
 import { loadCachedContacts, saveCachedContacts, saveCachedChats } from './contact-cache'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('RealAdapter')
 
 // Welshman imports
 import {
@@ -213,7 +216,7 @@ export class RealNostrAdapter implements INostrAdapter {
 
       return { success: true, data: msg }
     } catch (error) {
-      console.error('[RealAdapter] sendMessage failed:', error)
+      log.error('sendMessage failed', error)
       return { success: false, error: String(error) }
     }
   }
