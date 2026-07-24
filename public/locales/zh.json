@@ -79,7 +79,12 @@
     "mask_charset_blocks": "方块",
     "mask_charset_hangul": "韩文",
     "mask_charset_braille": "盲文",
-    "mask_charset_symbols": "符号",
+    "mask_charset_mongolian": "蒙文",
+    "mask_charset_tibetan": "臧文",
+    "mask_swipe_enabled": "滑动解除遮罩",
+    "mask_swipe_enabled_desc": "上下滑动消息列表时重新显示已遮罩内容，关闭后只有点击可恢复明文。",
+    "mask_swipe_threshold": "滑动阈值",
+    "mask_swipe_threshold_desc": "滑动超过该像素值才触发解除遮罩，避免误触。",
     "mask_tap_reveal": "点击显示",
     "allow_screenshot": "允许截屏",
     "allow_screenshot_desc": "开启后允许对应用截屏和录屏。关闭可获得更好的隐私保护。"
@@ -105,7 +110,8 @@
     "missing_messages": "可能缺少 {{count}} 条消息，点击尝试恢复",
     "recovering_messages": "正在恢复消息...",
     "recovery_failed": "无法恢复消息",
-    "send_failed": "发送失败，点击重试"
+    "send_failed": "发送失败，点击重试",
+    "loading_older": "正在加载更早的消息..."
   },
   "discover": {
     "title": "发现",

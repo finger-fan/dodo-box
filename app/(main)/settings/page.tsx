@@ -6,7 +6,7 @@ import {
   UserCircle, LogOut, Shield,
   Trash2, Download, ChevronRight, ChevronDown, Clock,
   RefreshCw, RotateCcw, Loader2,
-  EyeOff, Type,
+  EyeOff, Type, MoveVertical,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Toast from '@/components/ui/Toast';
@@ -25,8 +25,12 @@ import {
   MASK_SECONDS_OPTIONS,
   getMaskCharsetId,
   getMaskSeconds,
+  getMaskSwipeEnabled,
+  getMaskSwipeThreshold,
   setMaskCharsetId,
   setMaskSeconds,
+  setMaskSwipeEnabled,
+  setMaskSwipeThreshold,
 } from '@/lib/message-mask';
 import type { AdapterMode } from '@/lib/nostr';
 
@@ -65,6 +69,8 @@ export default function SettingsPage() {
 
   const [maskSeconds, setMaskSecondsState] = useState(() => getMaskSeconds());
   const [maskCharsetId, setMaskCharsetIdState] = useState(() => getMaskCharsetId());
+  const [maskSwipeEnabled, setMaskSwipeEnabledState] = useState(() => getMaskSwipeEnabled());
+  const [maskSwipeThreshold, setMaskSwipeThresholdState] = useState(() => getMaskSwipeThreshold());
   const [isMaskSecondsOpen, setIsMaskSecondsOpen] = useState(false);
   const [isMaskCharsetOpen, setIsMaskCharsetOpen] = useState(false);
   const ttlRef = useRef<HTMLDivElement>(null);
@@ -129,6 +135,18 @@ export default function SettingsPage() {
     setMaskCharsetIdState(id);
     setMaskCharsetId(id);
     setIsMaskCharsetOpen(false);
+  };
+
+  const handleMaskSwipeEnabledChange = (enabled: boolean) => {
+    setMaskSwipeEnabledState(enabled);
+    setMaskSwipeEnabled(enabled);
+  };
+
+  const handleMaskSwipeThresholdChange = (value: string) => {
+    const n = value === '' ? 0 : Number(value);
+    const next = Number.isFinite(n) && n > 0 ? Math.round(n) : getMaskSwipeThreshold();
+    setMaskSwipeThresholdState(next);
+    setMaskSwipeThreshold(next);
   };
 
   const currentMaskSecondsLabel = MASK_SECONDS_LABELS[maskSeconds] ?? 'settings.mask_off';
@@ -259,6 +277,52 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+            <div className="p-4 border-b border-zinc-50 dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MoveVertical className="w-5 h-5 text-zinc-400" />
+                  <div>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.mask_swipe_enabled')}</span>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.mask_swipe_enabled_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleMaskSwipeEnabledChange(!maskSwipeEnabled)}
+                  className={cn(
+                    "relative w-10 h-6 rounded-full transition-colors",
+                    maskSwipeEnabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                  )}
+                >
+                  <span className={cn(
+                    "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                    maskSwipeEnabled ? "left-[18px]" : "left-0.5"
+                  )} />
+                </button>
+              </div>
+            </div>
+            {maskSwipeEnabled && (
+              <div className="p-4 border-b border-zinc-50 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5" />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('settings.mask_swipe_threshold')}</span>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 max-w-[200px]">{t('settings.mask_swipe_threshold_desc')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={maskSwipeThreshold}
+                      onChange={(e) => handleMaskSwipeThresholdChange(e.target.value)}
+                      className="w-20 px-2 py-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-right"
+                    />
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">px</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

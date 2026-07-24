@@ -9,6 +9,7 @@ import type {
   NostrResult,
   NostrSession,
   NostrFilter,
+  GetMessagesOptions,
 } from './types'
 import { KIND_DM_WRAP, KIND_FOLLOWS, KIND_PROFILE } from './types'
 import { defaultAvatar, shortPubkey } from '@/lib/utils'
@@ -40,7 +41,7 @@ import {
 } from '@/lib/welshman/crypto'
 import type { TrustedEvent, SignedEvent } from '@welshman/util'
 
-const MESSAGE_FETCH_LIMIT = 100
+const DEFAULT_MESSAGE_PAGE_LIMIT = 50
 const MAX_PETNAME_LENGTH = 50
 
 // Regex: control chars (U+0000-U+001F, U+007F-U+009F), zero-width chars
@@ -106,17 +107,24 @@ export class RealNostrAdapter implements INostrAdapter {
     return [...this.chats]
   }
 
-  async getMessages(contactPubkey: string): Promise<NostrMessage[]> {
+  async getMessages(
+    contactPubkey: string,
+    opts?: GetMessagesOptions
+  ): Promise<NostrMessage[]> {
     if (!this.session.currentPubkey || !this.privkey) return []
 
     const messages: NostrMessage[] = []
-    const filters: NostrFilter[] = [
-      {
-        kinds: [KIND_DM_WRAP],
-        '#p': [this.session.currentPubkey],
-        limit: MESSAGE_FETCH_LIMIT,
-      },
-    ]
+    const filter: NostrFilter = {
+      kinds: [KIND_DM_WRAP],
+      '#p': [this.session.currentPubkey],
+      limit: opts?.limit ?? DEFAULT_MESSAGE_PAGE_LIMIT,
+    }
+    // `until` applies to the gift wrap's (randomized) created_at. Callers pass
+    // a boundary already discounted by the NIP-59 replay margin (~28h).
+    if (opts?.until !== undefined) {
+      filter.until = opts.until
+    }
+    const filters: NostrFilter[] = [filter]
 
     connectToRelays(this.relayUrls)
 

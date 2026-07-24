@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useMounted } from '@/hooks/use-mounted';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -58,14 +58,27 @@ export default function ChatView() {
   const searchParams = useSearchParams();
   const id = searchParams.get('peer') ?? '';
   const { adapter, session } = useNostr();
-  const { chatItems, sendMessage, isSending, recoverGap, retrySend } = useMessages(id);
-  const { seconds: maskSeconds, chars: maskChars } = useMaskSettings();
+  const { chatItems, sendMessage, isSending, recoverGap, retrySend, loadOlder, hasMore, isLoadingOlder } = useMessages(id);
+  const { seconds: maskSeconds, chars: maskChars, swipeEnabled, swipeThreshold } = useMaskSettings();
   const [msgInput, setMsgInput] = useState('');
   const mounted = useMounted();
   const [chatName, setChatName] = useState('');
   const [chatAvatar, setChatAvatar] = useState('');
+  const [scrollBumpedAt, setScrollBumpedAt] = useState<number | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Anchor captured before a history page fetch, used to keep the scroll
+  // position stable when older messages are prepended at the top.
+  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number; firstId?: string } | null>(null);
+  // Track user scroll gestures so only actual swipes (>= swipeThreshold px) bump
+  // the per-message mask timer; simple taps on the scroll area do not.
+  const gestureStartScrollRef = useRef<number | null>(null);
+  const wheelDeltaRef = useRef(0);
+  const hasBumpedRef = useRef(false);
+  const gestureResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Throttle user-scroll bumps so we do not re-render on every touchmove/wheel frame.
+  const lastBumpRef = useRef(0);
 
   // 缺少 peer 参数时退回聊天列表
   useEffect(() => {
@@ -156,14 +169,111 @@ export default function ChatView() {
     return () => { cancelled = true; };
   }, [id, adapter]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages (skipped while a history prepend
+  // is in flight — the compensation effect below owns the scroll position then)
   useEffect(() => {
     try {
+      if (prependAnchorRef.current) return;
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
       log.error('scrollIntoView failed', err);
     }
   }, [chatItems]);
+
+  // After older messages are prepended, compensate scrollTop by the added
+  // height so the viewport does not jump
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    if (!anchor) return;
+    const el = scrollContainerRef.current;
+    // First item unchanged → no prepend happened yet (e.g. bottom append)
+    if (!el || chatItems[0]?.id === anchor.firstId) return;
+    el.scrollTop = anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight);
+    prependAnchorRef.current = null;
+  }, [chatItems]);
+
+  // If a page fetch finished without prepending (history exhausted), drop the
+  // pending anchor so auto-scroll-to-bottom works again for new messages
+  useEffect(() => {
+    if (!isLoadingOlder) prependAnchorRef.current = null;
+  }, [isLoadingOlder]);
+
+  const bumpMaskTimer = useCallback(() => {
+    const now = Date.now();
+    if (now - lastBumpRef.current < 100) return;
+    lastBumpRef.current = now;
+    setScrollBumpedAt(now);
+  }, []);
+
+  const resetGesture = useCallback(() => {
+    gestureStartScrollRef.current = null;
+    wheelDeltaRef.current = 0;
+    hasBumpedRef.current = false;
+    gestureResetTimerRef.current = null;
+  }, []);
+
+  const scheduleGestureReset = useCallback(() => {
+    if (gestureResetTimerRef.current) clearTimeout(gestureResetTimerRef.current);
+    gestureResetTimerRef.current = setTimeout(resetGesture, 150);
+  }, [resetGesture]);
+
+  // WeChat-style stepped loading: hitting the top fetches the next older page.
+  const handleMessagesScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    if (el.scrollTop <= 40 && hasMore && !isLoadingOlder) {
+      prependAnchorRef.current = {
+        scrollHeight: el.scrollHeight,
+        scrollTop: el.scrollTop,
+        firstId: chatItems[0]?.id,
+      };
+      loadOlder();
+    }
+
+    // Touch swipe threshold check: onScroll fires after the browser scrolls,
+    // so we compare the current scrollTop with the one captured at touchStart.
+    if (swipeEnabled && gestureStartScrollRef.current !== null && !hasBumpedRef.current) {
+      const delta = Math.abs(el.scrollTop - gestureStartScrollRef.current);
+      if (delta >= swipeThreshold) {
+        bumpMaskTimer();
+        hasBumpedRef.current = true;
+      }
+    }
+  }, [hasMore, isLoadingOlder, chatItems, loadOlder, swipeEnabled, swipeThreshold, bumpMaskTimer]);
+
+  const handleTouchStart = useCallback(() => {
+    gestureStartScrollRef.current = scrollContainerRef.current?.scrollTop ?? 0;
+    wheelDeltaRef.current = 0;
+    hasBumpedRef.current = false;
+    if (gestureResetTimerRef.current) {
+      clearTimeout(gestureResetTimerRef.current);
+      gestureResetTimerRef.current = null;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    scheduleGestureReset();
+  }, [scheduleGestureReset]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!swipeEnabled || hasBumpedRef.current) return;
+    wheelDeltaRef.current += Math.abs(e.deltaY);
+    if (wheelDeltaRef.current >= swipeThreshold) {
+      bumpMaskTimer();
+      hasBumpedRef.current = true;
+    }
+    scheduleGestureReset();
+  }, [swipeEnabled, swipeThreshold, bumpMaskTimer, scheduleGestureReset]);
+
+  // Clean up the gesture reset timer when the view unmounts.
+  useEffect(() => {
+    return () => {
+      if (gestureResetTimerRef.current) {
+        clearTimeout(gestureResetTimerRef.current);
+      }
+    };
+  }, []);
 
   const adjustTextareaHeight = useCallback(() => {
     const ta = textareaRef.current;
@@ -207,7 +317,19 @@ export default function ChatView() {
       </header>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleMessagesScroll}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 overflow-y-auto p-4 space-y-2"
+      >
+        {isLoadingOlder && (
+          <div className="flex justify-center">
+            <span className="px-3 py-1 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-full text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t('chat.loading_older')}</span>
+          </div>
+        )}
         {chatItems.length === 0 ? (
           <div className="empty-chat flex flex-col items-center justify-center h-full opacity-20">
             <div className="empty-hint text-sm font-medium dark:text-zinc-400">{t('chat.no_messages')}</div>
@@ -248,7 +370,7 @@ export default function ChatView() {
                       ? "mine bg-emerald-600 text-white rounded-tr-none"
                       : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-tl-none border border-zinc-100 dark:border-zinc-800"
                   )}>
-                    <MaskedText key={`mask-${maskSeconds}-${maskChars}`} text={msg.text} seconds={maskSeconds} chars={maskChars} />
+                    <MaskedText text={msg.text} seconds={maskSeconds} chars={maskChars} scrollBumpedAt={scrollBumpedAt} />
                   </div>
                   <span className="text-[10px] text-zinc-400 mt-1 px-1 inline-flex items-center">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -11,6 +11,8 @@ export const StorageKey = {
   MESSAGE_TTL: 'dodobox_message_ttl',
   MASK_SECONDS: 'dodobox_mask_seconds',
   MASK_CHARSET: 'dodobox_mask_charset',
+  MASK_SWIPE_ENABLED: 'dodobox_mask_swipe_enabled',
+  MASK_SWIPE_THRESHOLD: 'dodobox_mask_swipe_threshold',
   ALLOW_SCREENSHOT: 'dodobox_allow_screenshot',
   CONTACT_CACHE: 'dodobox_contact_cache',
   REFRESH_LOGOUT: 'dodobox_refresh_logout',

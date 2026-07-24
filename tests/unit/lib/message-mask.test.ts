@@ -6,9 +6,15 @@ import {
   setMaskSeconds,
   getMaskCharsetId,
   setMaskCharsetId,
+  getMaskSwipeEnabled,
+  setMaskSwipeEnabled,
+  getMaskSwipeThreshold,
+  setMaskSwipeThreshold,
   MASK_CHARSETS,
   DEFAULT_CHARSET_ID,
   DEFAULT_MASK_SECONDS,
+  DEFAULT_MASK_SWIPE_ENABLED,
+  DEFAULT_MASK_SWIPE_THRESHOLD,
 } from '@/lib/message-mask'
 import { StorageKey } from '@/lib/storage'
 
@@ -109,6 +115,31 @@ describe('message-mask', () => {
       localStorage.setItem(StorageKey.MASK_SECONDS, '-5')
       expect(getMaskSeconds()).toBe(DEFAULT_MASK_SECONDS)
     })
+
+    it('getMaskSwipeEnabled returns default when not set', () => {
+      expect(getMaskSwipeEnabled()).toBe(DEFAULT_MASK_SWIPE_ENABLED)
+    })
+
+    it('setMaskSwipeEnabled persists and getMaskSwipeEnabled retrieves', () => {
+      setMaskSwipeEnabled(false)
+      expect(getMaskSwipeEnabled()).toBe(false)
+    })
+
+    it('getMaskSwipeThreshold returns default when not set', () => {
+      expect(getMaskSwipeThreshold()).toBe(DEFAULT_MASK_SWIPE_THRESHOLD)
+    })
+
+    it('setMaskSwipeThreshold persists and rounds values', () => {
+      setMaskSwipeThreshold(123.7)
+      expect(getMaskSwipeThreshold()).toBe(124)
+    })
+
+    it('getMaskSwipeThreshold falls back to default for invalid values', () => {
+      localStorage.setItem(StorageKey.MASK_SWIPE_THRESHOLD, 'not-a-number')
+      expect(getMaskSwipeThreshold()).toBe(DEFAULT_MASK_SWIPE_THRESHOLD)
+      localStorage.setItem(StorageKey.MASK_SWIPE_THRESHOLD, '-10')
+      expect(getMaskSwipeThreshold()).toBe(DEFAULT_MASK_SWIPE_THRESHOLD)
+    })
   })
 
   describe('MASK_CHARSETS', () => {
@@ -117,7 +148,7 @@ describe('message-mask', () => {
       expect(ids).toContain('blocks')
       expect(ids).toContain('hangul')
       expect(ids).toContain('braille')
-      expect(ids).toContain('symbols')
+      expect(ids).toContain('mongolian')
     })
 
     it('each charset has non-empty chars', () => {

@@ -8,6 +8,13 @@ import { detectGaps, insertGapIndicators, type ChatItem, type SeqGap } from '@/l
 
 const log = createLogger('useMessages')
 
+// Page size for stepped history loading (WeChat-style pagination)
+const MESSAGE_PAGE_SIZE = 50
+// NIP-59 gift wraps randomize created_at up to ~28h into the past, so paging
+// boundaries must be discounted by this replay margin. Overlapping events are
+// deduped by id on merge.
+const GIFT_WRAP_REPLAY_MARGIN_SECONDS = 28 * 60 * 60
+
 function sortMessages(a: NostrMessage, b: NostrMessage): number {
   const timeDiff = a.timestamp.getTime() - b.timestamp.getTime()
   if (timeDiff !== 0) return timeDiff
@@ -21,9 +28,18 @@ export function useMessages(contactPubkey: string) {
   const { adapter, session } = useNostr()
   const [messages, setMessages] = useState<NostrMessage[]>([])
   const [isSending, setIsSending] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
   const [recoveringGaps, setRecoveringGaps] = useState<Set<string>>(new Set())
   const sendQueueRef = useRef<string[]>([])
   const isProcessingRef = useRef(false)
+  const messagesRef = useRef<NostrMessage[]>([])
+  const hasMoreRef = useRef(true)
+  const loadingOlderRef = useRef(false)
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     log.debug(`useMessages effect: isAuthenticated=${session.isAuthenticated}, contactPubkey=${contactPubkey?.slice(0, 16)}...`)
@@ -32,11 +48,22 @@ export function useMessages(contactPubkey: string) {
     let mounted = true
     let unsubscribe: (() => void) | undefined
     try {
+      // Reset pagination state for the new chat target
+      hasMoreRef.current = true
+      setHasMore(true)
+      loadingOlderRef.current = false
+      setIsLoadingOlder(false)
+
       log.info(`Fetching messages for ${contactPubkey.slice(0, 16)}...`)
 
-      adapter.getMessages(contactPubkey).then((msgs) => {
+      adapter.getMessages(contactPubkey, { limit: MESSAGE_PAGE_SIZE }).then((msgs) => {
         if (!mounted) return
         log.debug(`Got ${msgs?.length || 0} messages`)
+        // A short first page means there is no older history to page through
+        if (!msgs || msgs.length < MESSAGE_PAGE_SIZE) {
+          hasMoreRef.current = false
+          setHasMore(false)
+        }
         // Merge with existing messages (subscription may have already added some
         // via the shared Tracker, so using the value form would overwrite them)
         setMessages(prev => {
@@ -102,6 +129,48 @@ export function useMessages(contactPubkey: string) {
       return []
     }
   }, [messages, recoveringGaps])
+
+  const loadOlder = useCallback(async () => {
+    if (!session.isAuthenticated || !contactPubkey) return
+    // Guard against concurrent page fetches on repeated top hits
+    if (loadingOlderRef.current || !hasMoreRef.current) return
+    const current = messagesRef.current
+    if (current.length === 0) return
+
+    loadingOlderRef.current = true
+    setIsLoadingOlder(true)
+    try {
+      const earliestMs = current.reduce(
+        (min, m) => Math.min(min, m.timestamp.getTime()),
+        Infinity
+      )
+      const until = Math.floor(earliestMs / 1000) - GIFT_WRAP_REPLAY_MARGIN_SECONDS
+      log.debug(`loadOlder: until=${until} (earliest=${new Date(earliestMs).toISOString()})`)
+
+      const older = await adapter.getMessages(contactPubkey, { until, limit: MESSAGE_PAGE_SIZE })
+
+      const existingIds = new Set(messagesRef.current.map(m => m.id))
+      const newMsgs = older.filter(m => !existingIds.has(m.id))
+      if (newMsgs.length > 0) {
+        setMessages(prev => {
+          const prevIds = new Set(prev.map(m => m.id))
+          const fresh = newMsgs.filter(m => !prevIds.has(m.id))
+          return fresh.length > 0 ? [...prev, ...fresh].sort(sortMessages) : prev
+        })
+      }
+
+      // Short page (or a page of pure duplicates) means history is exhausted
+      if (older.length < MESSAGE_PAGE_SIZE || newMsgs.length === 0) {
+        hasMoreRef.current = false
+        setHasMore(false)
+      }
+    } catch (err) {
+      log.error('loadOlder failed', err)
+    } finally {
+      loadingOlderRef.current = false
+      setIsLoadingOlder(false)
+    }
+  }, [adapter, contactPubkey, session.isAuthenticated])
 
   const recoverGap = useCallback(async (gap: SeqGap) => {
     const gapId = `gap-${gap.senderPubkey}-${gap.afterSeq}-${gap.beforeSeq}`
@@ -211,5 +280,5 @@ export function useMessages(contactPubkey: string) {
     }
   }, [adapter, contactPubkey, messages])
 
-  return { messages, chatItems, sendMessage, isSending, recoverGap, retrySend }
+  return { messages, chatItems, sendMessage, isSending, recoverGap, retrySend, loadOlder, hasMore, isLoadingOlder }
 }

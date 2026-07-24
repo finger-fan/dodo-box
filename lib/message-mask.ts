@@ -19,11 +19,14 @@ export const MASK_CHARSETS: readonly MaskCharset[] = [
   { id: 'blocks', labelKey: 'settings.mask_charset_blocks', chars: '░▒▓█▚▙▛▜▞' },
   { id: 'hangul', labelKey: 'settings.mask_charset_hangul', chars: '가나다라마바사아자차카타파하국난달랑맘봄솔' },
   { id: 'braille', labelKey: 'settings.mask_charset_braille', chars: '⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒' },
-  { id: 'symbols', labelKey: 'settings.mask_charset_symbols', chars: '#@%&$*?!§¶' },
+  { id: 'mongolian', labelKey: 'settings.mask_charset_mongolian', chars: 'ᠠᠡᠢᠣᠤᠥᠦᠧᠨᠪᠫᠬᠭᠮᠯᠰᠱᠲᠳᠴᠵᠶᠷᠸᠹᠺᠻᠼᠽᠾᠿᡀ' },
+  { id: 'tibetan', labelKey: 'settings.mask_charset_tibetan', chars: 'ཀཁགངཅཆཇཉཏཐདནཔཕབམཙཚཛཝཞཟའཡརལཤསཧཨ' },
 ];
 
 export const DEFAULT_CHARSET_ID = 'blocks';
 export const DEFAULT_MASK_SECONDS = 5; // 默认5s
+export const DEFAULT_MASK_SWIPE_ENABLED = true;
+export const DEFAULT_MASK_SWIPE_THRESHOLD = 100;
 
 export function getCharsById(id: string): string {
   const found = MASK_CHARSETS.find((c) => c.id === id);
@@ -51,6 +54,31 @@ export function getMaskCharsetId(): string {
 export function setMaskCharsetId(id: string): void {
   if (typeof window === 'undefined') return;
   store.set(StorageKey.MASK_CHARSET, id);
+  window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
+}
+
+export function getMaskSwipeEnabled(): boolean {
+  if (typeof window === 'undefined') return DEFAULT_MASK_SWIPE_ENABLED;
+  const raw = store.get<boolean>(StorageKey.MASK_SWIPE_ENABLED, DEFAULT_MASK_SWIPE_ENABLED);
+  return typeof raw === 'boolean' ? raw : DEFAULT_MASK_SWIPE_ENABLED;
+}
+
+export function setMaskSwipeEnabled(enabled: boolean): void {
+  if (typeof window === 'undefined') return;
+  store.set(StorageKey.MASK_SWIPE_ENABLED, enabled);
+  window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
+}
+
+export function getMaskSwipeThreshold(): number {
+  if (typeof window === 'undefined') return DEFAULT_MASK_SWIPE_THRESHOLD;
+  const n = store.get<number>(StorageKey.MASK_SWIPE_THRESHOLD, DEFAULT_MASK_SWIPE_THRESHOLD) ?? DEFAULT_MASK_SWIPE_THRESHOLD;
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : DEFAULT_MASK_SWIPE_THRESHOLD;
+}
+
+export function setMaskSwipeThreshold(threshold: number): void {
+  if (typeof window === 'undefined') return;
+  const n = Number.isFinite(threshold) && threshold > 0 ? Math.round(threshold) : DEFAULT_MASK_SWIPE_THRESHOLD;
+  store.set(StorageKey.MASK_SWIPE_THRESHOLD, n);
   window.dispatchEvent(new Event(MASK_SETTINGS_EVENT));
 }
 

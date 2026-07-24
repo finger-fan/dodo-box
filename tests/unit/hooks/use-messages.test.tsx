@@ -16,14 +16,23 @@ import type {
 const TEST_PUBKEY = 'a'.repeat(64)
 const CONTACT_PUBKEY = 'b'.repeat(64)
 
-function makeMessage(id: string, text: string): NostrMessage {
+function makeMessage(id: string, text: string, timestampMs = 1700000000000): NostrMessage {
   return {
     id,
     text,
     sender: 'them',
-    timestamp: new Date(1700000000000),
+    timestamp: new Date(timestampMs),
     senderPubkey: CONTACT_PUBKEY,
   }
+}
+
+const PAGE_SIZE = 50
+const REPLAY_MARGIN_SECONDS = 28 * 60 * 60
+
+function makePage(prefix: string, count: number, startTsMs: number, stepMs = 1000): NostrMessage[] {
+  return Array.from({ length: count }, (_, i) =>
+    makeMessage(`${prefix}-${i}`, `msg ${prefix}-${i}`, startTsMs + i * stepMs)
+  )
 }
 
 function createTestAdapter(
@@ -142,5 +151,127 @@ describe('useMessages', () => {
       subscriptionCallback!(makeMessage('msg-2', 'new message'))
     })
     expect(result.current.messages).toHaveLength(2)
+  })
+})
+
+describe('useMessages pagination', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('fetches the first page with a limit and sets hasMore=false for a short page', async () => {
+    const getMessages = vi.fn(async (): Promise<NostrMessage[]> => makePage('p1', 10, 1000000))
+    const adapter = createTestAdapter({ getMessages })
+
+    const { result } = renderHook(() => useMessages(CONTACT_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(10)
+    })
+    expect(getMessages).toHaveBeenCalledWith(CONTACT_PUBKEY, { limit: PAGE_SIZE })
+    expect(result.current.hasMore).toBe(false)
+  })
+
+  it('keeps hasMore=true when the first page is full', async () => {
+    const getMessages = vi.fn(async (): Promise<NostrMessage[]> => makePage('p1', PAGE_SIZE, 1000000))
+    const adapter = createTestAdapter({ getMessages })
+
+    const { result } = renderHook(() => useMessages(CONTACT_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(PAGE_SIZE)
+    })
+    expect(result.current.hasMore).toBe(true)
+  })
+
+  it('loadOlder fetches with until = earliest - 28h and prepends older messages', async () => {
+    const firstPage = makePage('p1', PAGE_SIZE, 2000000)
+    const olderPage = makePage('p0', 20, 1000000)
+    const getMessages = vi.fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(olderPage)
+    const adapter = createTestAdapter({ getMessages })
+
+    const { result } = renderHook(() => useMessages(CONTACT_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(PAGE_SIZE)
+    })
+
+    await act(async () => {
+      await result.current.loadOlder()
+    })
+
+    const expectedUntil = Math.floor(2000000 / 1000) - REPLAY_MARGIN_SECONDS
+    expect(getMessages).toHaveBeenNthCalledWith(2, CONTACT_PUBKEY, { until: expectedUntil, limit: PAGE_SIZE })
+    expect(result.current.messages).toHaveLength(PAGE_SIZE + 20)
+    // Older messages end up at the front
+    expect(result.current.messages[0].id).toBe('p0-0')
+    expect(result.current.hasMore).toBe(false) // short page => history exhausted
+  })
+
+  it('sets hasMore=false when the older page is all duplicates', async () => {
+    const firstPage = makePage('p1', PAGE_SIZE, 2000000)
+    // Relay replays events we already have (gift-wrap created_at overlap)
+    const getMessages = vi.fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(firstPage.slice(0, PAGE_SIZE))
+    const adapter = createTestAdapter({ getMessages })
+
+    const { result } = renderHook(() => useMessages(CONTACT_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(PAGE_SIZE)
+    })
+
+    await act(async () => {
+      await result.current.loadOlder()
+    })
+
+    expect(result.current.messages).toHaveLength(PAGE_SIZE)
+    expect(result.current.hasMore).toBe(false)
+  })
+
+  it('does not issue concurrent loadOlder fetches', async () => {
+    const firstPage = makePage('p1', PAGE_SIZE, 2000000)
+    let resolveOlder: (msgs: NostrMessage[]) => void = () => {}
+    const getMessages = vi.fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockImplementationOnce(() => new Promise<NostrMessage[]>((res) => { resolveOlder = res }))
+    const adapter = createTestAdapter({ getMessages })
+
+    const { result } = renderHook(() => useMessages(CONTACT_PUBKEY), {
+      wrapper: makeWrapper(adapter),
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(PAGE_SIZE)
+    })
+
+    // Fire two loadOlder calls while the first page fetch is still in flight
+    let first: Promise<void> = Promise.resolve()
+    act(() => {
+      first = result.current.loadOlder()
+    })
+    expect(result.current.isLoadingOlder).toBe(true)
+    await act(async () => {
+      await result.current.loadOlder()
+    })
+    expect(getMessages).toHaveBeenCalledTimes(2) // initial + one loadOlder only
+
+    await act(async () => {
+      resolveOlder(makePage('p0', 5, 1000000))
+      await first
+    })
+    expect(result.current.messages).toHaveLength(PAGE_SIZE + 5)
+    expect(result.current.isLoadingOlder).toBe(false)
   })
 })

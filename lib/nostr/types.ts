@@ -106,9 +106,19 @@ export interface NostrEvent {
   sig: string
 }
 
+/**
+ * Pagination options for getMessages.
+ * `until` is a unix timestamp (seconds) applied to the gift wrap's created_at;
+ * `limit` caps how many wrap events are fetched (relays return the newest first).
+ */
+export interface GetMessagesOptions {
+  until?: number
+  limit?: number
+}
+
 export interface INostrAdapter {
   getChats(): Promise<NostrChat[]>
-  getMessages(contactPubkey: string): Promise<NostrMessage[]>
+  getMessages(contactPubkey: string, opts?: GetMessagesOptions): Promise<NostrMessage[]>
   sendMessage(contactPubkey: string, text: string): Promise<NostrResult<NostrMessage>>
   subscribeToMessages(
     contactPubkey: string,

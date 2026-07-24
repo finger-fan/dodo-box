@@ -79,7 +79,12 @@
     "mask_charset_blocks": "Blocks",
     "mask_charset_hangul": "Hangul",
     "mask_charset_braille": "Braille",
-    "mask_charset_symbols": "Symbols",
+    "mask_charset_mongolian": "mongolian",
+    "mask_charset_tibetan": "tibetan",
+    "mask_swipe_enabled": "Swipe to reveal",
+    "mask_swipe_enabled_desc": "Re-reveal masked messages when scrolling the chat. When off, only taps reveal them.",
+    "mask_swipe_threshold": "Swipe threshold",
+    "mask_swipe_threshold_desc": "Only swipes exceeding this many pixels trigger reveal, preventing accidental taps.",
     "mask_tap_reveal": "Tap to reveal",
     "allow_screenshot": "Allow Screenshot",
     "allow_screenshot_desc": "Enable to allow screenshots and screen recording. Disable for better privacy protection."
@@ -105,7 +110,8 @@
     "missing_messages": "{{count}} message(s) may be missing. Tap to recover.",
     "recovering_messages": "Recovering messages...",
     "recovery_failed": "Could not recover messages",
-    "send_failed": "Failed to send. Tap to retry."
+    "send_failed": "Failed to send. Tap to retry.",
+    "loading_older": "Loading earlier messages..."
   },
   "discover": {
     "title": "Discover",

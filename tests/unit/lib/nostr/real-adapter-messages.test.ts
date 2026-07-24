@@ -211,4 +211,26 @@ describe('RealNostrAdapter.getMessages', () => {
     const messages = await adapter.getMessages(CONTACT_PUBKEY)
     expect(messages).toEqual([])
   })
+
+  it('defaults to a 50-event page without an until filter', async () => {
+    mockFetchEvents.mockResolvedValue([])
+
+    const adapter = createAdapter()
+    await adapter.getMessages(CONTACT_PUBKEY)
+
+    const filters = mockFetchEvents.mock.calls[0][0]
+    expect(filters[0].limit).toBe(50)
+    expect(filters[0].until).toBeUndefined()
+  })
+
+  it('passes until/limit pagination options into the relay filter', async () => {
+    mockFetchEvents.mockResolvedValue([])
+
+    const adapter = createAdapter()
+    await adapter.getMessages(CONTACT_PUBKEY, { until: 123456, limit: 50 })
+
+    const filters = mockFetchEvents.mock.calls[0][0]
+    expect(filters[0].until).toBe(123456)
+    expect(filters[0].limit).toBe(50)
+  })
 })

@@ -7,6 +7,7 @@ import type {
   NostrContact,
   NostrProfile,
   NostrResult,
+  GetMessagesOptions,
 } from './types'
 import { defaultAvatar } from '@/lib/utils'
 
@@ -114,14 +115,23 @@ export class MockTelegramAdapter implements INostrAdapter {
     return [...this.chatsCache]
   }
 
-  async getMessages(contactPubkey: string): Promise<NostrMessage[]> {
+  async getMessages(contactPubkey: string, opts?: GetMessagesOptions): Promise<NostrMessage[]> {
     const cacheKey = contactPubkey
-    if (this.messageCache.has(cacheKey)) return [...this.messageCache.get(cacheKey)!]
+    if (!this.messageCache.has(cacheKey)) {
+      const chatId = pubkeyToChatId(contactPubkey)
+      const messages = await this.fetchChatMessages(chatId)
+      this.messageCache.set(cacheKey, messages)
+    }
 
-    const chatId = pubkeyToChatId(contactPubkey)
-    const messages = await this.fetchChatMessages(chatId)
-    this.messageCache.set(cacheKey, messages)
-    return [...messages]
+    let messages = [...this.messageCache.get(cacheKey)!]
+    if (opts?.until !== undefined) {
+      messages = messages.filter(m => m.timestamp.getTime() / 1000 <= opts.until!)
+    }
+    if (opts?.limit !== undefined && messages.length > opts.limit) {
+      // Relays return the newest `limit` events; emulate that on the ascending list
+      messages = messages.slice(-opts.limit)
+    }
+    return messages
   }
 
   private async fetchChatMessages(chatId: number): Promise<NostrMessage[]> {

@@ -4,16 +4,22 @@ import { useEffect, useState } from 'react';
 import {
   DEFAULT_CHARSET_ID,
   DEFAULT_MASK_SECONDS,
+  DEFAULT_MASK_SWIPE_ENABLED,
+  DEFAULT_MASK_SWIPE_THRESHOLD,
   MASK_SETTINGS_EVENT,
   getCharsById,
   getMaskCharsetId,
   getMaskSeconds,
+  getMaskSwipeEnabled,
+  getMaskSwipeThreshold,
 } from '@/lib/message-mask';
 
 export interface MaskSettings {
   seconds: number;
   charsetId: string;
   chars: string;
+  swipeEnabled: boolean;
+  swipeThreshold: number;
 }
 
 /**
@@ -25,6 +31,8 @@ export function useMaskSettings(): MaskSettings {
     seconds: DEFAULT_MASK_SECONDS,
     charsetId: DEFAULT_CHARSET_ID,
     chars: getCharsById(DEFAULT_CHARSET_ID),
+    swipeEnabled: DEFAULT_MASK_SWIPE_ENABLED,
+    swipeThreshold: DEFAULT_MASK_SWIPE_THRESHOLD,
   });
 
   useEffect(() => {
@@ -34,6 +42,8 @@ export function useMaskSettings(): MaskSettings {
         seconds: getMaskSeconds(),
         charsetId,
         chars: getCharsById(charsetId),
+        swipeEnabled: getMaskSwipeEnabled(),
+        swipeThreshold: getMaskSwipeThreshold(),
       });
     };
     read();
