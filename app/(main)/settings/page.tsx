@@ -34,6 +34,8 @@ import {
 } from '@/lib/message-mask';
 import type { AdapterMode } from '@/lib/nostr';
 
+const DEFAULT_TTL = 86400;
+
 const TTL_OPTIONS = [
   { value: 600, labelKey: 'settings.ttl_10min' },
   { value: 1800, labelKey: 'settings.ttl_30min' },
@@ -60,8 +62,8 @@ export default function SettingsPage() {
   const mounted = useMounted();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [messageTtl, setMessageTtl] = useState(() => {
-    if (typeof window === 'undefined') return 2592000;
-    return store.get(StorageKey.MESSAGE_TTL, 2592000);
+    if (typeof window === 'undefined') return DEFAULT_TTL;
+    return store.get(StorageKey.MESSAGE_TTL, DEFAULT_TTL);
   });
   const [isTtlOpen, setIsTtlOpen] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(() => isContactCacheEnabled());
@@ -329,7 +331,7 @@ export default function SettingsPage() {
         {/* Privacy */}
         <section className="space-y-3">
           <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('settings.privacy')}</div>
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-3xl">
             <div className="flex items-center justify-between p-4 border-b border-zinc-50 dark:border-zinc-800">
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5 text-zinc-400" />
@@ -428,7 +430,7 @@ export default function SettingsPage() {
         {isNative && (
           <section className="space-y-3">
             <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">{t('updater.section_title')}</div>
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-3xl">
               <div className="p-4 border-b border-zinc-50 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

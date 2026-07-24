@@ -3,7 +3,6 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
@@ -15,8 +14,18 @@
         <item name="android:background">@null</item>
     </style>
 
-
+    <!-- SplashScreen: 绿色背景 + 白色盾牌（透明前景） -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- 窗口背景：绿色 -->
+        <item name="windowSplashScreenBackground">@color/colorPrimary</item>
+        
+        <!-- Splash 图标：使用透明前景（只有白色盾牌线条） -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        
+        <!-- 图标背景：透明（因为前景已经有白色线条了） -->
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        
+        <!-- 动画时长 -->
+        <item name="windowSplashScreenAnimationDuration">300</item>
     </style>
 </resources>
