@@ -7,6 +7,7 @@
 
 import { PrivacyScreen } from '@capacitor/privacy-screen';
 import { store, StorageKey } from '@/lib/storage';
+import { Capacitor } from '@capacitor/core';
 
 /**
  * 获取用户是否允许截屏的偏好设置
@@ -24,6 +25,20 @@ export function isScreenshotAllowed(): boolean {
 export function setScreenshotAllowed(allowed: boolean): void {
   if (typeof window === 'undefined') return;
   store.set(StorageKey.ALLOW_SCREENSHOT, allowed);
+}
+
+/**
+ * 立即根据当前 localStorage 偏好应用截屏保护/解禁。
+ * 仅在原生平台调用，Web 端无操作。
+ */
+export async function applyScreenshotPreference(): Promise<void> {
+  if (typeof window === 'undefined' || !Capacitor.isNativePlatform()) return;
+  const allowed = isScreenshotAllowed();
+  if (allowed) {
+    await disablePrivacy();
+  } else {
+    await enablePrivacy();
+  }
 }
 
 /**

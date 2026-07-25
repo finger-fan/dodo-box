@@ -21,6 +21,8 @@ export const StorageKey = {
   SEQ_COUNTER: 'dodobox_seq',
   USER_RELAYS: 'dodobox_user_relays',
   RELAY_QUALITY: 'dodobox_relay_quality',
+  LAST_READ_MESSAGE_ID: 'dodobox_last_read_message_id',
+  LAST_MESSAGE_ID: 'dodobox_last_message_id',
 } as const
 
 export type StorageKeyType = typeof StorageKey[keyof typeof StorageKey]

@@ -85,10 +85,12 @@
     "mask_swipe_enabled_desc": "Re-reveal masked messages when scrolling the chat. When off, only taps reveal them.",
     "mask_swipe_threshold": "Swipe threshold",
     "mask_swipe_threshold_desc": "Only swipes exceeding this many pixels trigger reveal, preventing accidental taps.",
-    "mask_tap_reveal": "Tap to reveal",
-    "allow_screenshot": "Allow Screenshot",
-    "allow_screenshot_desc": "Enable to allow screenshots and screen recording. Disable for better privacy protection."
-  },
+   "mask_tap_reveal": "Tap to reveal",
+   "allow_screenshot": "Allow Screenshot",
+    "allow_screenshot_desc": "Enable to allow screenshots and screen recording. Disable for better privacy protection.",
+    "screenshot_updated": "Screenshot setting updated",
+    "screenshot_update_failed": "Failed to update screenshot setting"
+ },
   "contacts": {
     "add_contact": "Add Contact",
     "search_contacts": "Search contacts...",
@@ -106,6 +108,7 @@
     "online": "Online",
     "no_messages": "No messages yet",
     "today": "Today",
+    "yesterday": "Yesterday",
     "type_message": "Type a message...",
     "missing_messages": "{{count}} message(s) may be missing. Tap to recover.",
     "recovering_messages": "Recovering messages...",

@@ -1,3 +1,10 @@
+allowBuilds:
+  '@tailwindcss/oxide': true
+  core-js: true
+  protobufjs: true
+  re2: true
+  sharp: true
+  unrs-resolver: true
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - cbor-extract

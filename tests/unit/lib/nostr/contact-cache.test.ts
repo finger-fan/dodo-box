@@ -9,6 +9,7 @@ import {
   setContactCacheEnabled,
 } from '@/lib/nostr/contact-cache'
 import type { NostrContact, NostrChat } from '@/lib/nostr/types'
+import { store, StorageKey } from '@/lib/storage'
 
 const PUBKEY = 'a'.repeat(64)
 
@@ -55,7 +56,7 @@ describe('contact-cache', () => {
 
     it('load returns empty', () => {
       // Manually write data bypassing the guard
-      localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, JSON.stringify(sampleContacts))
+      store.set(`${StorageKey.CONTACTS_CACHE}_${PUBKEY}`, sampleContacts)
       expect(loadCachedContacts(PUBKEY)).toEqual([])
     })
   })
@@ -75,13 +76,13 @@ describe('contact-cache', () => {
         expect(loadCachedContacts(PUBKEY)).toEqual(sampleContacts)
       })
 
-      it('returns empty array for invalid JSON', () => {
-        localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, 'not-json')
+      it('returns empty array for non-array string values', () => {
+        store.set(`${StorageKey.CONTACTS_CACHE}_${PUBKEY}`, 'not-json')
         expect(loadCachedContacts(PUBKEY)).toEqual([])
       })
 
-      it('returns empty array for non-array JSON', () => {
-        localStorage.setItem(`dodobox_contacts_cache_${PUBKEY}`, '{"key":"value"}')
+      it('returns empty array for non-array object values', () => {
+        store.set(`${StorageKey.CONTACTS_CACHE}_${PUBKEY}`, { key: 'value' })
         expect(loadCachedContacts(PUBKEY)).toEqual([])
       })
 
@@ -95,9 +96,8 @@ describe('contact-cache', () => {
     describe('saveCachedContacts', () => {
       it('persists contacts to localStorage', () => {
         saveCachedContacts(PUBKEY, sampleContacts)
-        const raw = localStorage.getItem(`dodobox_contacts_cache_${PUBKEY}`)
-        expect(raw).not.toBeNull()
-        expect(JSON.parse(raw!)).toEqual(sampleContacts)
+        const stored = store.get<NostrContact[]>(`${StorageKey.CONTACTS_CACHE}_${PUBKEY}`)
+        expect(stored).toEqual(sampleContacts)
       })
 
       it('overwrites previous cache', () => {
@@ -118,8 +118,8 @@ describe('contact-cache', () => {
         expect(loadCachedChats(PUBKEY)).toEqual(sampleChats)
       })
 
-      it('returns empty array for invalid JSON', () => {
-        localStorage.setItem(`dodobox_chats_cache_${PUBKEY}`, '{broken')
+      it('returns empty array for non-array values', () => {
+        store.set(`${StorageKey.CHATS_CACHE}_${PUBKEY}`, '{broken')
         expect(loadCachedChats(PUBKEY)).toEqual([])
       })
     })
@@ -127,9 +127,8 @@ describe('contact-cache', () => {
     describe('saveCachedChats', () => {
       it('persists chats to localStorage', () => {
         saveCachedChats(PUBKEY, sampleChats)
-        const raw = localStorage.getItem(`dodobox_chats_cache_${PUBKEY}`)
-        expect(raw).not.toBeNull()
-        expect(JSON.parse(raw!)).toEqual(sampleChats)
+        const stored = store.get<NostrChat[]>(`${StorageKey.CHATS_CACHE}_${PUBKEY}`)
+        expect(stored).toEqual(sampleChats)
       })
     })
   })

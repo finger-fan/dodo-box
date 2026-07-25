@@ -104,10 +104,11 @@ export class MockTelegramAdapter implements INostrAdapter {
         id: `chat-${chatId}`,
         pubkey: contact.pubkey,
         name: contact.name,
-        lastMsg: lastMsg?.text || '',
+        lastMsg: '',
         time: lastMsg ? this.formatTime(lastMsg.timestamp) : '',
         unread: messages.filter(m => m.sender === 'them').length,
         avatar: defaultAvatar(contact.name),
+        lastMessageId: lastMsg?.id,
       })
     }
 

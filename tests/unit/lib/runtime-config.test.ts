@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getDefaultRelays, getUserRelays, setUserRelays, clearUserRelays } from '@/lib/runtime-config'
+import { store, StorageKey } from '@/lib/storage'
 
 describe('runtime-config', () => {
   beforeEach(() => {
@@ -33,13 +34,13 @@ describe('runtime-config', () => {
     expect(getUserRelays()).toEqual([])
   })
 
-  it('getUserRelays handles corrupted JSON gracefully', () => {
-    localStorage.setItem('dodobox_user_relays', 'not-json')
+  it('getUserRelays handles non-array values gracefully', () => {
+    store.set(StorageKey.USER_RELAYS, 'not-an-array')
     expect(getUserRelays()).toEqual([])
   })
 
   it('getUserRelays filters non-string entries', () => {
-    localStorage.setItem('dodobox_user_relays', JSON.stringify(['valid', '', 123, null]))
+    store.set(StorageKey.USER_RELAYS, ['valid', '', 123, null])
     expect(getUserRelays()).toEqual(['valid'])
   })
 })

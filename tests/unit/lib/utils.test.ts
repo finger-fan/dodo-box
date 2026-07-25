@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
-import { cn, decodeContactInfo, encodeIdentityInfo, decodeIdentityInfo, shortPubkey } from '@/lib/utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { cn, decodeContactInfo, encodeIdentityInfo, decodeIdentityInfo, shortPubkey, formatChatDate } from '@/lib/utils'
 
 const FAKE_PUBKEY_HEX = 'a'.repeat(64)
 
@@ -103,5 +103,34 @@ describe('shortPubkey', () => {
   it('handles empty string gracefully', () => {
     // Should not throw even if npubEncode fails
     expect(() => shortPubkey('')).not.toThrow()
+  })
+})
+
+describe('formatChatDate', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-25T12:00:00'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns today label for same-day messages', () => {
+    const msgDate = new Date('2026-07-25T08:00:00')
+    expect(formatChatDate(msgDate, '今天', '昨天', 'zh-CN')).toBe('今天')
+  })
+
+  it('returns yesterday label for previous-day messages', () => {
+    const msgDate = new Date('2026-07-24T20:00:00')
+    expect(formatChatDate(msgDate, '今天', '昨天', 'zh-CN')).toBe('昨天')
+  })
+
+  it('returns localized date string for older messages', () => {
+    const msgDate = new Date('2026-07-20T12:00:00')
+    const result = formatChatDate(msgDate, '今天', '昨天', 'zh-CN')
+    expect(result).not.toBe('今天')
+    expect(result).not.toBe('昨天')
+    expect(result).toContain('2026')
   })
 })

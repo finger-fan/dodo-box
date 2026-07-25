@@ -51,6 +51,7 @@ export interface NostrChat {
   time: string
   unread: number
   avatar: string
+  lastMessageId?: string
 }
 
 export interface NostrContact {

@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useMounted } from '@/hooks/use-mounted';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { cn, defaultAvatar, shortPubkey } from '@/lib/utils';
+import { cn, defaultAvatar, shortPubkey, formatChatDate } from '@/lib/utils';
 import { useMessages } from '@/hooks/nostr/use-messages';
 import { isGapIndicator } from '@/lib/nostr/gap-detection';
-import type { DeliveryStatus } from '@/lib/nostr/types';
+import type { GapIndicator } from '@/lib/nostr/gap-detection';
+import type { NostrMessage, DeliveryStatus } from '@/lib/nostr/types';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMaskSettings } from '@/hooks/use-mask-settings';
 import MaskedText from '@/components/chat/MaskedText';
@@ -53,7 +54,7 @@ function SendStatusIcon({ status, onRetry }: { status?: DeliveryStatus; onRetry?
 }
 
 export default function ChatView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get('peer') ?? '';
@@ -174,7 +175,7 @@ export default function ChatView() {
   useEffect(() => {
     try {
       if (prependAnchorRef.current) return;
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     } catch (err) {
       log.error('scrollIntoView failed', err);
     }
@@ -282,19 +283,38 @@ export default function ChatView() {
     ta.style.height = `${ta.scrollHeight}px`;
   }, []);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!msgInput.trim() || isSending) return;
     const text = msgInput;
     setMsgInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    try {
-      await sendMessage(text);
-    } catch (err) {
-      log.error('handleSend failed', err);
-    }
+    void sendMessage(text);
   };
+
+  const chatItemsWithDates = useMemo(() => {
+    type RenderItem =
+      | { kind: 'date'; label: string; id: string }
+      | { kind: 'gap'; item: GapIndicator }
+      | { kind: 'message'; item: NostrMessage };
+
+    const items: RenderItem[] = [];
+    let lastDateLabel: string | null = null;
+    for (const item of chatItems) {
+      if (isGapIndicator(item)) {
+        items.push({ kind: 'gap', item });
+        continue;
+      }
+      const dateLabel = formatChatDate(item.timestamp, t('chat.today'), t('chat.yesterday'), i18n.language);
+      if (dateLabel !== lastDateLabel) {
+        items.push({ kind: 'date', label: dateLabel, id: `date-${dateLabel}` });
+        lastDateLabel = dateLabel;
+      }
+      items.push({ kind: 'message', item });
+    }
+    return items;
+  }, [chatItems, t, i18n.language]);
 
   if (!mounted) return null;
 
@@ -336,11 +356,16 @@ export default function ChatView() {
           </div>
         ) : (
           <>
-            <div className="date-sep flex justify-center">
-              <span className="px-3 py-1 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-full text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t('chat.today')}</span>
-            </div>
-            {chatItems.map((item) => {
-              if (isGapIndicator(item)) {
+            {chatItemsWithDates.map((renderItem) => {
+              if (renderItem.kind === 'date') {
+                return (
+                  <div key={renderItem.id} className="date-sep flex justify-center">
+                    <span className="px-3 py-1 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-full text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{renderItem.label}</span>
+                  </div>
+                );
+              }
+              if (renderItem.kind === 'gap') {
+                const item = renderItem.item;
                 return (
                   <div key={item.id} className="flex justify-center my-2">
                     <button
@@ -355,7 +380,7 @@ export default function ChatView() {
                   </div>
                 );
               }
-              const msg = item;
+              const msg = renderItem.item;
               return (
                 <div
                   key={msg.id}

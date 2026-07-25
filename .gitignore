@@ -15,6 +15,12 @@ ref/**
 playwright-report/
 test-results/
 tests/e2e/screenshots/
+tests/*.jpg
+tests/*.jpeg
+tests/*.png
+
+# pnpm local store
+.pnpm-store/
 
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo

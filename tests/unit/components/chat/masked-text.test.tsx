@@ -17,9 +17,9 @@ describe('MaskedText', () => {
 
   it('reveals text initially then masks after seconds', () => {
     render(<MaskedText text="hello" seconds={2} chars="░" />)
-    expect(screen.getByText('hello')).toBeTruthy()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('hello')
     act(() => vi.advanceTimersByTime(2000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
   })
 
   it('resets the mask timer when scrollBumpedAt changes', () => {
@@ -29,31 +29,31 @@ describe('MaskedText', () => {
     rerender(<MaskedText text="hello" seconds={2} chars="░" scrollBumpedAt={1} />)
     // The old 2s timer would have fired at 2s; the new timer fires 2s after the bump.
     act(() => vi.advanceTimersByTime(1000))
-    expect(screen.getByText('hello')).toBeTruthy()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('hello')
     act(() => vi.advanceTimersByTime(1000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
   })
 
   it('scroll bump reveals a masked message and resets its timer', () => {
     const { rerender } = render(<MaskedText text="hello" seconds={2} chars="░" />)
     act(() => vi.advanceTimersByTime(3000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
 
     // User scroll bump resets the timer and reveals the message.
     rerender(<MaskedText text="hello" seconds={2} chars="░" scrollBumpedAt={2} />)
-    expect(screen.getByText('hello')).toBeTruthy()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('hello')
     act(() => vi.advanceTimersByTime(2000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
   })
 
   it('click reveals masked text and re-masks after seconds', () => {
     render(<MaskedText text="hello" seconds={2} chars="░" />)
     act(() => vi.advanceTimersByTime(3000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
     act(() => fireEvent.click(screen.getByRole('button')))
-    expect(screen.getByText('hello')).toBeTruthy()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('hello')
     act(() => vi.advanceTimersByTime(2000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('░░░░░')
   })
 
   it('shows plaintext when seconds is 0', () => {

@@ -384,6 +384,7 @@ export class RealNostrAdapter implements INostrAdapter {
       time: '',
       unread: 0,
       avatar: c.avatar || '',
+      lastMessageId: '',
     }))
     if (this.session.currentPubkey) {
       saveCachedChats(this.session.currentPubkey, this.chats)
@@ -443,6 +444,7 @@ export class RealNostrAdapter implements INostrAdapter {
         time: '',
         unread: 0,
         avatar: newContact.avatar || '',
+        lastMessageId: '',
       },
     ]
     if (this.session.currentPubkey) {
@@ -600,4 +602,3 @@ export class RealNostrAdapter implements INostrAdapter {
     return { success: true, data: undefined }
   }
 }
-

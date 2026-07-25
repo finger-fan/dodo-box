@@ -19,7 +19,7 @@ import { store, StorageKey } from '@/lib/storage';
 import { useUpdater } from '@/hooks/use-updater';
 import { Capacitor } from '@capacitor/core';
 import { isContactCacheEnabled, setContactCacheEnabled } from '@/lib/nostr/contact-cache';
-import { isScreenshotAllowed, setScreenshotAllowed } from '@/lib/privacy-screen';
+import { isScreenshotAllowed, setScreenshotAllowed, applyScreenshotPreference } from '@/lib/privacy-screen';
 import {
   MASK_CHARSETS,
   MASK_SECONDS_OPTIONS,
@@ -366,10 +366,16 @@ export default function SettingsPage() {
                 </div>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const next = !screenshotAllowed;
                   setScreenshotAllowed(next);
                   setScreenshotAllowedState(next);
+                  try {
+                    await applyScreenshotPreference();
+                    setToast({ message: t('settings.screenshot_updated'), type: 'success' });
+                  } catch {
+                    setToast({ message: t('settings.screenshot_update_failed'), type: 'error' });
+                  }
                 }}
                 className={cn(
                   "relative w-10 h-6 rounded-full transition-colors",

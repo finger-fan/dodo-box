@@ -5,6 +5,11 @@ import { useNostr } from '@/contexts/NostrContext'
 import { createLogger } from '@/lib/logger'
 import type { NostrMessage } from '@/lib/nostr/types'
 import { detectGaps, insertGapIndicators, type ChatItem, type SeqGap } from '@/lib/nostr/gap-detection'
+import {
+  getLastReadMessageId,
+  setLastReadMessageId,
+  setLastMessageId,
+} from '@/lib/nostr/message-read-state'
 
 const log = createLogger('useMessages')
 
@@ -22,6 +27,12 @@ function sortMessages(a: NostrMessage, b: NostrMessage): number {
     return (a.seq ?? 0) - (b.seq ?? 0)
   }
   return 0
+}
+
+function latestMessageId(msgs: NostrMessage[]): string | undefined {
+  if (!msgs.length) return undefined
+  // Messages are sorted ascending by timestamp; the last element is the newest.
+  return [...msgs].sort(sortMessages)[msgs.length - 1]?.id
 }
 
 export function useMessages(contactPubkey: string) {
@@ -72,6 +83,11 @@ export function useMessages(contactPubkey: string) {
           const newMsgs = msgs.filter(m => !existingIds.has(m.id))
           return newMsgs.length > 0 ? [...prev, ...newMsgs].sort(sortMessages) : prev
         })
+        const latestId = latestMessageId(msgs)
+        if (latestId) {
+          setLastMessageId(contactPubkey, latestId)
+          setLastReadMessageId(contactPubkey, latestId)
+        }
       }).catch((err) => {
         log.error('adapter.getMessages failed', err)
       })
@@ -90,6 +106,8 @@ export function useMessages(contactPubkey: string) {
               log.debug(`Received new message: ${msg.id?.slice(0, 8)}...`)
               return [...prev, msg]
             })
+            setLastMessageId(contactPubkey, msg.id)
+            setLastReadMessageId(contactPubkey, msg.id)
           }
         } catch (err) {
           log.error('subscribeToMessages callback failed', err)

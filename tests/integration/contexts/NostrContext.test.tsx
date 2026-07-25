@@ -48,6 +48,7 @@ vi.mock('@/lib/nostr', async (importOriginal) => {
 })
 
 import { vaultSync } from '@/lib/nostr/vault-sync'
+import { store, StorageKey } from '@/lib/storage'
 
 const MOCK_VAULT: VaultData = {
   version: 1,
@@ -82,12 +83,12 @@ describe('NostrProvider - initial state', () => {
   })
 
   it('restores session in locked state when privkeys are lost (no auto-logout)', async () => {
-    localStorage.setItem('dodobox_session', JSON.stringify({
+    store.set(StorageKey.SESSION, {
       isAuthenticated: true,
       username: 'alice',
       currentPubkey: 'a'.repeat(64),
       vaultData: null,
-    }))
+    })
 
     const { captured } = renderWithProvider()
 
@@ -95,7 +96,7 @@ describe('NostrProvider - initial state', () => {
     const ctx = captured[captured.length - 1]
     expect(ctx.session.isAuthenticated).toBe(true)
     expect(ctx.session.locked).toBe(true)
-    expect(localStorage.getItem('dodobox_session')).not.toBeNull()
+    expect(localStorage.getItem(StorageKey.SESSION)).not.toBeNull()
   })
 })
 
@@ -138,11 +139,10 @@ describe('login', () => {
       await captured[captured.length - 1].login('bob', 'pass')
     })
 
-    const stored = localStorage.getItem('dodobox_session')
+    const stored = store.get<{ isAuthenticated?: boolean; username?: string }>(StorageKey.SESSION)
     expect(stored).not.toBeNull()
-    const parsed = JSON.parse(stored!)
-    expect(parsed.isAuthenticated).toBe(true)
-    expect(parsed.username).toBe('bob')
+    expect(stored!.isAuthenticated).toBe(true)
+    expect(stored!.username).toBe('bob')
   })
 })
 

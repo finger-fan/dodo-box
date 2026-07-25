@@ -24,7 +24,7 @@ export const MASK_CHARSETS: readonly MaskCharset[] = [
 ];
 
 export const DEFAULT_CHARSET_ID = 'blocks';
-export const DEFAULT_MASK_SECONDS = 5; // 默认5s
+export const DEFAULT_MASK_SECONDS = 10; // 默认10s
 export const DEFAULT_MASK_SWIPE_ENABLED = true;
 export const DEFAULT_MASK_SWIPE_THRESHOLD = 100;
 

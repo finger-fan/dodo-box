@@ -115,53 +115,56 @@ describe('MaskedText scroll threshold behavior', () => {
     render(<ChatViewWithThreshold maskSeconds={5} />)
 
     act(() => vi.advanceTimersByTime(5000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
 
     act(() => {
       fireEvent.click(screen.getByTestId('add-msg'))
     })
     act(() => vi.advanceTimersByTime(0))
 
-    expect(screen.queryByText('hello')).toBeNull()
+    // After adding a new message there are two MaskedText instances;
+    // the first (original) message must stay masked.
+    const visibleLayers = screen.getAllByTestId('masked-text-visible')
+    expect(visibleLayers[0].textContent).not.toBe('hello')
   })
 
   it('does not bump the timer on a small wheel movement below the threshold', () => {
     render(<ChatViewWithThreshold maskSeconds={5} swipeThreshold={100} />)
 
     act(() => vi.advanceTimersByTime(5000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
 
     act(() => {
       fireEvent.wheel(screen.getByTestId('scroll-container'), { deltaY: 50 })
     })
 
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
   })
 
   it('bumps the timer when wheel movement reaches the threshold', () => {
     render(<ChatViewWithThreshold maskSeconds={5} swipeThreshold={100} />)
 
     act(() => vi.advanceTimersByTime(5000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
 
     act(() => {
       fireEvent.wheel(screen.getByTestId('scroll-container'), { deltaY: 120 })
     })
 
-    expect(screen.getByText('hello')).toBeTruthy()
+    expect(screen.getByTestId('masked-text-visible').textContent).toBe('hello')
   })
 
   it('does not bump the timer on a tap without scroll', () => {
     render(<ChatViewWithThreshold maskSeconds={5} swipeThreshold={100} />)
 
     act(() => vi.advanceTimersByTime(5000))
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
 
     act(() => {
       fireEvent.touchStart(screen.getByTestId('scroll-container'))
       fireEvent.touchEnd(screen.getByTestId('scroll-container'))
     })
 
-    expect(screen.queryByText('hello')).toBeNull()
+    expect(screen.getByTestId('masked-text-visible').textContent).not.toBe('hello')
   })
 })

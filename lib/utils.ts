@@ -129,3 +129,29 @@ export function shortPubkey(pubkeyHex: string): string {
     return `${pubkeyHex.slice(0, 8)}...`;
   }
 }
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Format a message date into a chat separator label.
+ * Returns "today"/"yesterday" i18n keys or a localized date string.
+ */
+export function formatChatDate(
+  date: Date,
+  todayLabel: string,
+  yesterdayLabel: string,
+  locale?: string
+): string {
+  const now = new Date();
+  if (isSameDay(date, now)) return todayLabel;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(date, yesterday)) return yesterdayLabel;
+  return date.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' });
+}

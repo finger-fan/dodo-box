@@ -12,6 +12,7 @@ import AddContactModal from '@/components/contacts/AddContactModal';
 import { useChats } from '@/hooks/nostr/use-chats';
 import { useNostr } from '@/contexts/NostrContext';
 import { useMounted } from '@/hooks/use-mounted';
+import { chatHasUnreadMessages } from '@/lib/nostr/message-read-state';
 
 export default function MessagesPage() {
   const { t } = useTranslation();
@@ -81,18 +82,17 @@ export default function MessagesPage() {
                   <div className="w-14 h-14 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-800 relative">
                     <Image src={chat.avatar} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
                   </div>
-                  {chat.unread > 0 && (
+                  {(chat.unread > 0 || chatHasUnreadMessages(chat)) && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-zinc-950">
-                      {chat.unread}
+                      {chat.unread > 0 ? chat.unread : '•'}
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center justify-between">
                     <span className="font-bold text-zinc-900 dark:text-zinc-100">{chat.name}</span>
                     <span className="text-[10px] font-medium text-zinc-400">{chat.time}</span>
                   </div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{chat.lastMsg}</p>
                 </div>
               </button>
             </SwipeableListItem>

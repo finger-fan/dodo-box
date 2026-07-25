@@ -73,11 +73,22 @@ export default function MaskedText({ text, seconds, chars, scrollBumpedAt }: Mas
       }}
       title={revealed ? undefined : t('settings.mask_tap_reveal')}
       aria-label={revealed ? text : t('settings.mask_tap_reveal')}
-      className={revealed
-        ? 'whitespace-pre-wrap break-words cursor-pointer'
-        : 'whitespace-pre-wrap break-words cursor-pointer select-none'}
+      className="cursor-pointer"
     >
-      {revealed ? text : masked}
+      {revealed ? (
+        <span data-testid="masked-text-visible" className="whitespace-pre-wrap break-words">{text}</span>
+      ) : (
+        <span className="relative inline-block">
+          {/* 透明原文占位：决定气泡宽度和行数 */}
+          <span className="whitespace-pre-wrap break-words select-none text-transparent">
+            {text}
+          </span>
+          {/* 遮罩层覆盖：同宽同高，超出的字符截断 */}
+          <span data-testid="masked-text-visible" className="absolute inset-0 whitespace-pre-wrap break-words overflow-hidden select-none">
+            {masked}
+          </span>
+        </span>
+      )}
     </span>
   );
 }
